@@ -1,0 +1,19 @@
+{
+  "identifier": "default",
+  "description": "Capabilities granted to the main window for the bio-pro IDE",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "fs:allow-read-text-file",
+    "fs:allow-read-dir",
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    {
+      "identifier": "fs:allow-create",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    "dialog:allow-open"
+  ]
+}

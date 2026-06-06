@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+scipy==1.15.0
+numpy==2.2.1
+pydantic==2.10.4
+anthropic==0.69.0
+sqlalchemy==2.0.36
+biopython==1.85
+sbol3==1.2.0.post0
+mcp>=1.0.0
+reportlab>=4.0.0

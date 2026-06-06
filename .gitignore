@@ -1,0 +1,11 @@
+node_modules/
+frontend/dist/
+backend/__pycache__/
+backend/dist/
+backend/build/
+backend/.pytest_cache/
+src-tauri/target/
+src-tauri/backend-server-dist/
+*.pyc
+*.pyo
+*.db
