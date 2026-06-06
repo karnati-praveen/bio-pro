@@ -65,10 +65,14 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      # ── Tauri build via npm CLI (avoids long cargo-install step) ─────────────
+      # ── Tauri build via npm CLI ───────────────────────────────────────────────
+      # Run from repo root so Tauri finds src-tauri/tauri.conf.json in a subfolder.
+      # VITE_API_BASE_URL is injected via env: (no cross-env needed).
       - name: Build Tauri app (NSIS installer)
-        working-directory: frontend
-        run: npm run tauri:build
+        env:
+          VITE_API_BASE_URL: "http://127.0.0.1:8000"
+        shell: pwsh
+        run: frontend\node_modules\.bin\tauri build
 
       # ── Upload artifact ───────────────────────────────────────────────────────
       - name: Upload NSIS installer (.exe setup)
