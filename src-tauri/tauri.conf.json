@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "build": {
     "frontendDist": "../frontend/dist",
-    "beforeBuildCommand": "cd ../frontend && npm run build"
+    "beforeBuildCommand": "npm --prefix ../frontend run build"
   },
   "app": {
     "windows": [
@@ -26,18 +26,22 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "resources": {
       "backend-server-dist/": "backend-server/"
     },
     "windows": {
       "nsis": {
-        "installMode": "currentUser",
-        "allowDowngrades": true
+        "installMode": "currentUser"
       },
       "webviewInstallMode": {
-        "type": "embedBootstrapper",
-        "silent": true
+        "type": "embedBootstrapper"
       }
     }
   }

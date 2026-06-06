@@ -55,6 +55,10 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Generate Cargo.lock
+        working-directory: src-tauri
+        run: cargo generate-lockfile
+
       - name: Cache Rust build artifacts
         uses: actions/cache@v4
         with:
