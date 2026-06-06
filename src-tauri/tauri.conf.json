@@ -30,11 +30,11 @@
     "resources": {
       "backend-server-dist/": "backend-server/"
     },
-    "nsis": {
-      "installMode": "currentUser",
-      "allowDowngrades": true
-    },
     "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "allowDowngrades": true
+      },
       "webviewInstallMode": {
         "type": "embedBootstrapper",
         "silent": true
