@@ -3,8 +3,8 @@
   "identifier": "com.bio-pro.app",
   "version": "0.1.0",
   "build": {
-    "frontendDist": "../frontend/dist",
-    "beforeBuildCommand": "npm --prefix ../frontend run build"
+    "frontendDist": "../src/dist",
+    "beforeBuildCommand": "npm --prefix ../src run build"
   },
   "app": {
     "windows": [

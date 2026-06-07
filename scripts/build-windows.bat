@@ -36,7 +36,7 @@ xcopy /E /I /Y "%SRC%" "%DST%" || goto :error
 :: ── 3. Frontend npm install (handles cross-env + @tauri-apps/cli) ──────────
 echo.
 echo [3/4] Installing frontend deps...
-cd /d "%~dp0..\frontend"
+cd /d "%~dp0..\src"
 npm install || goto :error
 
 :: ── 4. Tauri build (triggers vite build via beforeBuildCommand) ─────────────

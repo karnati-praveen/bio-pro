@@ -46,7 +46,7 @@ jobs:
           node-version: "20"
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: src
         run: npm install
 
       # ── Rust (required by Tauri core compilation) ─────────────────────────────
@@ -76,7 +76,7 @@ jobs:
         env:
           VITE_API_BASE_URL: "http://127.0.0.1:8000"
         shell: pwsh
-        run: frontend\node_modules\.bin\tauri build
+        run: src\node_modules\.bin\tauri build
 
       # ── Upload artifact ───────────────────────────────────────────────────────
       - name: Upload NSIS installer (.exe setup)

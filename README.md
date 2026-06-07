@@ -16,20 +16,31 @@ language (or via a structured form), and the tool:
 
 - **Inducible expression** circuits only: derepression (IPTG/pLac, aTc/pTet) and
   activation (arabinose/pBAD).
-- A library of 15 real genetic parts in [`backend/data/parts.json`](backend/data/parts.json).
-- No database, no external biology APIs — everything runs locally.
+- A library of 15 real genetic parts in [`src/data/parts.json`](src/data/parts.json).
+- No external biology APIs — everything runs locally.
 
 ## Architecture
 
+Feature-based monorepo: each `src/modules/<feature>/` folder co-locates that
+feature's FastAPI code (`api.py` + logic) **and** its React UI (`.jsx`), with
+cross-cutting code under `src/shared/`.
+
 ```
-backend/                 Python · FastAPI · scipy
-  data/parts.json        genetic parts library
-  models/                parts loader + Pydantic schemas
-  compiler/              parser → rules → assembler  (intent → circuit)
-  simulation/ode.py      Hill-kinetics ODE model (scipy solve_ivp)
-  main.py                FastAPI endpoints
-frontend/                React · Vite · React Flow · Recharts
-  src/components/         GoalInput, CircuitDiagram, SimulationPlot, SpecPanel, PartsLegend
+src/                       Python · FastAPI · scipy  +  React · Vite · React Flow
+  main.py                  FastAPI app entry (registers each module's router)
+  data/parts.json          genetic parts library
+  modules/
+    compiler/              parser → rules → assembler + GoalInput, CircuitEditor, …
+    simulation/            ode.py / stochastic.py + SimulationPlot, ParameterSweep, …
+    parts/  sequence/  assembly/  ordering/  citations/  export/  llm/  settings/
+  shared/
+    db/                    SQLAlchemy engine + models + repo
+    schemas/               Pydantic schemas
+    lib/                   biopro-language, vscode-shim, api client (client.js)
+    stores/                Zustand stores
+    ui/                    cross-module React components
+  shell/                   Tauri + React app shell (App.jsx, main.jsx, index.html)
+src-tauri/                 Rust · Tauri native shell (unchanged)
 ```
 
 The compiler runs in three transparent stages, each emitting a human-readable trace
@@ -37,16 +48,16 @@ shown in the UI's **Compiler trace** panel:
 
 | Stage | File | Role |
 |-------|------|------|
-| Parser | [`compiler/parser.py`](backend/compiler/parser.py) | text / form → `IntentSpec` |
-| Rules | [`compiler/rules.py`](backend/compiler/rules.py) | declarative inducer → promoter-system table |
-| Assembler | [`compiler/assembler.py`](backend/compiler/assembler.py) | `IntentSpec` → circuit nodes + edges |
+| Parser | [`parser.py`](src/modules/compiler/parser.py) | text / form → `IntentSpec` |
+| Rules | [`rules.py`](src/modules/compiler/rules.py) | declarative inducer → promoter-system table |
+| Assembler | [`assembler.py`](src/modules/compiler/assembler.py) | `IntentSpec` → circuit nodes + edges |
 
 ## Running
 
 ### Backend (port 8000)
 
 ```bash
-cd backend
+cd src
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
@@ -54,7 +65,7 @@ uvicorn main:app --reload --port 8000
 ### Frontend (port 5173)
 
 ```bash
-cd frontend
+cd src
 npm install
 npm run dev
 ```

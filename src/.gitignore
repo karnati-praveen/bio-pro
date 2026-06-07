@@ -1,4 +1,10 @@
+# Python
 __pycache__/
 *.pyc
 data/designs.db
 .env
+
+# Frontend (Vite) — this directory is now also the frontend root
+node_modules/
+dist/
+build/
