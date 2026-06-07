@@ -9,7 +9,7 @@ echo ============================================================
 :: ── 1. PyInstaller backend bundle ──────────────────────────────────────────
 echo.
 echo [1/4] Installing Python deps and building backend bundle...
-cd /d "%~dp0..\backend"
+cd /d "%~dp0..\src"
 pip install -r requirements.txt || goto :error
 pip install pyinstaller        || goto :error
 pyinstaller bio_pro.spec --clean --noconfirm || goto :error
@@ -17,7 +17,7 @@ pyinstaller bio_pro.spec --clean --noconfirm || goto :error
 :: ── 2. Copy onedir bundle into Tauri resource slot ─────────────────────────
 echo.
 echo [2/4] Copying backend bundle to src-tauri/backend-server-dist...
-set SRC=%~dp0..\backend\dist\backend-server
+set SRC=%~dp0..\src\dist\backend-server
 set DST=%~dp0..\src-tauri\backend-server-dist\backend-server
 
 :: Safety guard: refuse to rmdir if the path variable is empty or suspiciously short.

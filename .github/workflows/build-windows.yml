@@ -21,19 +21,19 @@ jobs:
           python-version: "3.12"
 
       - name: Install Python dependencies + PyInstaller
-        working-directory: backend
+        working-directory: src
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build backend bundle (PyInstaller)
-        working-directory: backend
+        working-directory: src
         run: pyinstaller bio_pro.spec --clean --noconfirm
 
       - name: Copy backend bundle into Tauri resource slot
         shell: powershell
         run: |
-          $src = "backend\dist\backend-server"
+          $src = "src\dist\backend-server"
           $dst = "src-tauri\backend-server-dist\backend-server"
           if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
           New-Item -ItemType Directory -Force -Path (Split-Path $dst) | Out-Null
