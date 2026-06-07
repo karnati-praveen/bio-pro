@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "bio-compiler": {
+      "command": "python",
+      "args": ["backend/mcp_server.py"],
+      "env": {}
+    }
+  }
+}

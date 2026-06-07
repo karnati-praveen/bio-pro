@@ -77,6 +77,33 @@ class Design(Base):
     )
 
 
+class SimulationRun(Base):
+    """A saved simulation run: parameters used + a results summary, for the history view."""
+
+    __tablename__ = "simulation_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    design_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    label: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    mode: Mapped[str] = mapped_column(String(32), default="ode")  # ode/stochastic/sweep/sensitivity
+    organism: Mapped[str] = mapped_column(String(32), nullable=True)
+    params_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    summary_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "design_id": self.design_id,
+            "label": self.label,
+            "mode": self.mode,
+            "organism": self.organism,
+            "params": self.params_json or {},
+            "summary": self.summary_json or {},
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 class DesignVersion(Base):
     __tablename__ = "design_versions"
     __table_args__ = (UniqueConstraint("design_id", "version_no"),)

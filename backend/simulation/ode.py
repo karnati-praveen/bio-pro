@@ -1,4 +1,4 @@
-"""ODE simulation: Hill-kinetics models for all 12 circuit patterns + parameter sweep.
+"""ODE simulation: Hill-kinetics models for all 15 circuit patterns + parameter sweep.
 
 Host-specific constants scale transcription/translation/dilution rates.
 """
@@ -75,7 +75,7 @@ def _host_cfg(organism: Optional[str]) -> dict:
 def _resolve(params: Optional[SimParams], organism: Optional[str] = None) -> dict:
     p = params or SimParams()
     hc = _host_cfg(organism)
-    t_end = hc["t_end"]
+    t_end = p.duration if getattr(p, "duration", None) else hc["t_end"]
     return {
         "beta_p": (p.beta_p if p.beta_p is not None else BETA_P) * hc["beta_p_scale"],
         "gamma_p": (p.gamma_p if p.gamma_p is not None else GAMMA_P) * hc["gamma_scale"],
@@ -105,10 +105,19 @@ def _drive(mode: str, R: float, inducer: float, k: float, n: float) -> float:
 
 
 def _combine(pattern: str, drives: list[float]) -> float:
-    if pattern in ("logic_and",):
+    if pattern == "logic_and":
         return drives[0] * drives[1]
-    if pattern in ("logic_or",):
+    if pattern == "logic_or":
         return 1.0 - (1.0 - drives[0]) * (1.0 - drives[1])
+    if pattern == "logic_nand":
+        return 1.0 - drives[0] * drives[1]
+    if pattern == "logic_nor":
+        return (1.0 - drives[0]) * (1.0 - drives[1])
+    if pattern == "combinatorial_logic":
+        f = 1.0
+        for d in drives:
+            f *= d
+        return f
     return drives[0]
 
 
@@ -531,6 +540,43 @@ def sweep(req: SweepRequest) -> SweepResponse:
         sensitivity_score=round(sensitivity, 4),
         top_sensitive=top_sensitive[:3],
     )
+
+
+def sensitivity_analysis(spec: IntentSpec, organism: Optional[str] = None) -> dict:
+    """Full sensitivity sweep over all parameters → tornado-chart rows.
+
+    For each parameter, perturb ±50% around its default and measure the change in
+    peak reporter output. Returns the baseline peak plus per-parameter low/high peaks
+    and an impact score (% output change), ranked descending.
+    """
+    cfg = _resolve(None, organism)
+    base_sim = simulate(spec, None)
+    base_rep = next((s for s in base_sim.series if s.is_reporter), base_sim.series[0])
+    base_peak = _reporter_peak(base_rep.values)
+
+    rows: list[dict] = []
+    for pname in _ALL_PARAMS:
+        base_val = cfg.get(pname, K if pname == "k" else N if pname == "n" else BETA_P)
+        if base_val <= 0:
+            continue
+        try:
+            lo = simulate(spec, SimParams(**{pname: base_val * 0.5}))
+            hi = simulate(spec, SimParams(**{pname: base_val * 2.0}))
+            lo_peak = _reporter_peak(next((s for s in lo.series if s.is_reporter), lo.series[0]).values)
+            hi_peak = _reporter_peak(next((s for s in hi.series if s.is_reporter), hi.series[0]).values)
+        except Exception:
+            lo_peak = hi_peak = base_peak
+        impact = abs(hi_peak - lo_peak) / base_peak * 100 if base_peak > 0 else 0.0
+        rows.append({
+            "parameter": pname,
+            "base_value": round(float(base_val), 4),
+            "low_peak": round(lo_peak, 4),
+            "high_peak": round(hi_peak, 4),
+            "impact_pct": round(impact, 1),
+            "critical": impact > 20.0,
+        })
+    rows.sort(key=lambda r: r["impact_pct"], reverse=True)
+    return {"baseline_peak": round(base_peak, 4), "rows": rows}
 
 
 def _rank_sensitivity(spec: IntentSpec, organism: Optional[str]) -> list[dict]:

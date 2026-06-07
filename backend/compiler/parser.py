@@ -1,6 +1,6 @@
 """Stage 1 of the compiler: normalize user input into a formal IntentSpec.
 
-Supports all 12 circuit patterns via keyword matching.  The deterministic regex path
+Supports all 15 circuit patterns via keyword matching.  The deterministic regex path
 runs when the LLM is unavailable; the LLM path resolves language → ids and then calls
 parse_form.
 """
@@ -103,7 +103,7 @@ def _detect_host(text: str) -> str | None:
 
 
 def parse_text(raw: str, organism: str | None = None) -> IntentSpec:
-    """Parse free-text biological goal → IntentSpec (12-pattern aware)."""
+    """Parse free-text biological goal → IntentSpec (15-pattern aware)."""
     text = raw.strip().lower()
     trace: list[str] = [f'parsing free text: "{raw.strip()}"']
 
@@ -198,6 +198,25 @@ def parse_text(raw: str, organism: str | None = None) -> IntentSpec:
             pattern="band_pass_filter",
             organism=host,
             trace=trace,
+        )
+
+    if named in ("logic_nand", "logic_nor", "combinatorial_logic"):
+        output = _find_first(text, _REPORTER_ALIASES) or "GFP"
+        inducers_found = _find_all(text, _INDUCER_ALIASES)
+        if len(inducers_found) < 2:
+            raise ParseError(
+                f"{named.replace('_', ' ')} requires at least two inducers. "
+                "Supported: " + ", ".join(supported_inducers())
+            )
+        keep = len(inducers_found) if named == "combinatorial_logic" else 2
+        triggers = [Trigger(inducer=ind, presence="present") for ind in inducers_found[:keep]]
+        trace.extend([
+            f"reporter: {output}",
+            f"inputs: {', '.join(t.inducer for t in triggers)}",
+            f"selected pattern: {named}",
+        ])
+        return IntentSpec(
+            output=output, triggers=triggers, pattern=named, organism=host, trace=trace,
         )
 
     # --- Standard inducer-based patterns ---------------------------------- #

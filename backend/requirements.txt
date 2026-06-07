@@ -9,3 +9,7 @@ biopython==1.85
 sbol3==1.2.0.post0
 mcp[cli]>=1.0.0
 reportlab>=4.0.0
+# Optional LLM provider packages (lazy-imported; install the ones you need)
+openai>=1.0.0
+google-generativeai>=0.8.0
+mistralai>=1.0.0

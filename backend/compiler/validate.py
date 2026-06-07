@@ -19,22 +19,26 @@ from compiler.rules import (
     DEFAULT_TERMINATOR,
     REGULATOR_PROMOTER,
     ORTHOGONALITY_WARNINGS,
+    CROSS_REACTIVITY_MATRIX,
     system_for_inducer,
 )
 
-_LOGIC_PROMOTER_IDS = {"pAND", "pOR", "GATE"}
+_LOGIC_PROMOTER_IDS = {"pAND", "pOR", "pNAND", "pNOR", "pCOMBI", "GATE", "INV"}
 _TU_GRAMMAR = ("promoter", "rbs", "cds", "terminator")
 
-# Known cross-reactive repressor pairs (from literature characterization)
+# Repressor pairs flagged as cross-reactive, derived from the cross-reactivity matrix.
 _CROSS_REACTIVE_PAIRS: list[tuple[str, str]] = [
-    # LacI, TetR, AraC are characterized as orthogonal in E. coli:
-    # No cross-reactivity at physiological expression levels.
-    # This table is for future additions as new repressors are added.
+    (a, b)
+    for a, row in CROSS_REACTIVITY_MATRIX.items()
+    for b, level in row.items()
+    if a < b and level == "weak"
 ]
 
 
-def _f(code: str, severity: str, msg: str, target: str | None = None) -> ValidationFinding:
-    return ValidationFinding(code=code, severity=severity, message=msg, target=target)
+def _f(code: str, severity: str, msg: str, target: str | None = None,
+       fix: str | None = None) -> ValidationFinding:
+    return ValidationFinding(code=code, severity=severity, message=msg,
+                             target=target, fix_suggestion=fix)
 
 
 # --------------------------------------------------------------------------- #
@@ -155,7 +159,9 @@ def _check_host_compatibility(spec: IntentSpec, circuit: Circuit, findings: list
         if compat and spec.organism not in compat:
             findings.append(_f("host_incompatible", "error",
                 f"Part '{node.id}' ({node.label}) is not characterized for "
-                f"'{spec.organism}'. Compatible hosts: {', '.join(compat)}.", node.id))
+                f"'{spec.organism}'. Compatible hosts: {', '.join(compat)}.", node.id,
+                fix=f"Swap '{node.id}' for a part validated in {spec.organism}, "
+                    f"or change the host to one of: {', '.join(compat)}."))
 
 
 # --------------------------------------------------------------------------- #
@@ -168,7 +174,9 @@ def _check_terminators(circuit: Circuit, findings: list) -> None:
         if part is None or part.get("type") != "terminator":
             findings.append(_f("missing_terminator", "warning",
                 f"TU '{tu.name}' does not end in a terminator; read-through may occur.",
-                tu.name))
+                tu.name,
+                fix=f"Append a terminator (e.g. {DEFAULT_TERMINATOR} or L3S2P21) to the "
+                    "end of this transcription unit."))
 
 
 def _check_part_reuse(circuit: Circuit, findings: list) -> None:
@@ -204,7 +212,9 @@ def _check_leaky_expression(circuit: Circuit, findings: list) -> None:
                 f"Promoter '{node.id}' has high basal leakiness "
                 f"({basal/max_e*100:.0f}% of max). "
                 "Consider stronger repressor or double-repression architecture.",
-                node.id))
+                node.id,
+                fix=f"Add a second repressor binding site to '{node.id}', or swap in a "
+                    "tighter promoter (e.g. pTet has lower basal than pBAD)."))
 
 
 def _check_metabolic_burden(circuit: Circuit, findings: list) -> None:
@@ -229,7 +239,9 @@ def _check_metabolic_burden(circuit: Circuit, findings: list) -> None:
         findings.append(_f("metabolic_burden", "warning",
             f"Circuit has {len(driven_cds)} strongly-expressed CDS parts. "
             "This may impose excessive metabolic burden. Consider weaker promoters "
-            "or staggered expression."))
+            "or staggered expression.",
+            fix="Move one or more CDS onto weaker promoters (e.g. a J23-series part) or "
+                "express them sequentially rather than simultaneously."))
 
 
 def _check_oscillation_risk(spec: IntentSpec, circuit: Circuit, findings: list) -> None:
@@ -254,7 +266,9 @@ def _check_oscillation_risk(spec: IntentSpec, circuit: Circuit, findings: list) 
                         f"Negative feedback loop detected ({src} represses its upstream "
                         f"promoter {tgt}). With sufficient time delay, this may oscillate. "
                         "Verify protein half-life and time delay are compatible.",
-                        src))
+                        src,
+                        fix="Add a buffering gene to reduce loop gain, or use a faster-"
+                            "degrading reporter to shorten the feedback delay."))
 
 
 def _check_orthogonality(circuit: Circuit, findings: list) -> None:
@@ -269,7 +283,32 @@ def _check_orthogonality(circuit: Circuit, findings: list) -> None:
             findings.append(_f("cross_reactivity", "warning",
                 f"Repressors '{a}' and '{b}' may cross-react. "
                 "Verify orthogonality experimentally before deployment.",
-                f"{a}/{b}"))
+                f"{a}/{b}",
+                fix=f"Replace '{a}' or '{b}' with an orthogonal repressor (e.g. TetR or "
+                    "AraC) — see the Parts Library compatibility grid."))
+
+
+def _check_rbs_strength(circuit: Circuit, findings: list) -> None:
+    """Check #7: RBS translation rate >> promoter transcription rate → bottleneck risk.
+
+    Compares the RBS translation efficiency against the promoter's max transcription
+    output within each transcription unit; a ratio > 10 flags an oversized RBS.
+    """
+    for tu in circuit.transcription_units:
+        promoter = library.get_part(tu.parts[0]) if tu.parts else None
+        rbs = library.get_part(tu.parts[1]) if len(tu.parts) > 1 else None
+        if not promoter or not rbs or rbs.get("type") != "rbs":
+            continue
+        txn = (promoter.get("kinetic_parameters") or {}).get("max_expression", 0.0)
+        tln = (rbs.get("kinetic_parameters") or {}).get("translation_efficiency", 0.0)
+        if txn > 0 and tln / txn > 10.0:
+            findings.append(_f("rbs_strength_mismatch", "warning",
+                f"RBS '{rbs['id']}' (translation {tln}) is oversized for promoter "
+                f"'{promoter['id']}' (transcription {txn}); a translation bottleneck or "
+                "ribosome sequestration may result.",
+                rbs["id"],
+                fix=f"Pair '{promoter['id']}' with a weaker RBS (e.g. B0032/B0031) or use a "
+                    "stronger promoter to balance transcription and translation."))
 
 
 # --------------------------------------------------------------------------- #
@@ -292,6 +331,7 @@ def validate(spec: IntentSpec, circuit: Circuit) -> ValidationResult:
     _check_metabolic_burden(circuit, findings)
     _check_oscillation_risk(spec, circuit, findings)
     _check_orthogonality(circuit, findings)
+    _check_rbs_strength(circuit, findings)
 
     ok = not any(f.severity == "error" for f in findings)
     return ValidationResult(ok=ok, findings=findings)

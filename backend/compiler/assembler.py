@@ -1,6 +1,6 @@
 """Stage 3 of the compiler: turn an IntentSpec into a concrete genetic Circuit.
 
-Supports all 12 circuit patterns.  Each topology has its own _build_* function
+Supports all 15 circuit patterns.  Each topology has its own _build_* function
 that returns nodes, edges, and transcription units.
 """
 
@@ -21,7 +21,14 @@ from compiler.rules import (
     system_for_inducer,
 )
 
-_GATE_LABEL = {"logic_and": "AND", "logic_or": "OR"}
+_GATE_LABEL = {
+    "logic_and": "AND",
+    "logic_or": "OR",
+    "logic_nand": "NAND",
+    "logic_nor": "NOR",
+    "combinatorial_logic": "COMBI",
+}
+_INVERTING_GATES = {"logic_nand", "logic_nor"}
 
 
 class AssemblyError(ValueError):
@@ -136,7 +143,11 @@ def _build_constitutive(spec: IntentSpec, output: str) -> Circuit:
 
 
 def _build_two_input_gate(spec: IntentSpec, output: str) -> Circuit:
+    """Multi-input logic gate. Handles AND/OR (direct), NAND/NOR (inverted output via
+    an internal repressor that gates a constitutive reporter promoter), and N-input
+    combinatorial (AND of all inputs)."""
     gate_label = _GATE_LABEL[spec.pattern]
+    inverting = spec.pattern in _INVERTING_GATES
     branches = [_input_branch(t.inducer) for t in spec.triggers]
 
     gate_node = _synthetic_node("GATE", f"{gate_label} gate", "logic")
@@ -146,17 +157,38 @@ def _build_two_input_gate(spec: IntentSpec, output: str) -> Circuit:
     edges = [e for b in branches for e in b["edges"]]
     for b in branches:
         edges.append(CircuitEdge(source=b["promoter"], target="GATE", kind="expression"))
-    edges.append(CircuitEdge(source="GATE", target=output, kind="expression"))
 
-    output_tu = TranscriptionUnit(
-        name=f"{output} cassette ({gate_label} output)",
-        parts=[f"p{gate_label}", DEFAULT_RBS, output, DEFAULT_TERMINATOR],
-    )
+    inputs_active = {
+        "logic_and": "ALL", "combinatorial_logic": "ALL",
+        "logic_or": "ANY", "logic_nand": "NOT ALL", "logic_nor": "NO",
+    }[spec.pattern]
+
+    if inverting:
+        # Inverted output: GATE drives an internal repressor that represses a
+        # constitutive reporter promoter, so the reporter is ON unless the gate fires.
+        inv_node = _synthetic_node("INV", f"{gate_label} inverter", "logic", color="#e63946")
+        nodes += [_node(REGULATOR_PROMOTER), inv_node]
+        edges += [
+            CircuitEdge(source="GATE", target="INV", kind="expression"),
+            CircuitEdge(source=REGULATOR_PROMOTER, target=output, kind="expression"),
+            CircuitEdge(source="INV", target=output, kind="repression"),
+        ]
+        output_tu = TranscriptionUnit(
+            name=f"{output} cassette ({gate_label} output)",
+            parts=[REGULATOR_PROMOTER, DEFAULT_RBS, output, DEFAULT_TERMINATOR],
+        )
+    else:
+        edges.append(CircuitEdge(source="GATE", target=output, kind="expression"))
+        output_tu = TranscriptionUnit(
+            name=f"{output} cassette ({gate_label} output)",
+            parts=[f"p{gate_label}", DEFAULT_RBS, output, DEFAULT_TERMINATOR],
+        )
+
     trace = [
         f"output reporter: {output}",
         f"{gate_label} gate of: {', '.join(t.inducer for t in spec.triggers)}",
         *[b["trace"] for b in branches],
-        f"{output} expressed when {'BOTH' if spec.pattern == 'logic_and' else 'EITHER'} inputs active",
+        f"{output} expressed when {inputs_active} inputs active",
     ]
     return Circuit(nodes=_dedupe_nodes(nodes), edges=edges,
                    transcription_units=[*[b["tu"] for b in branches], output_tu], trace=trace)
@@ -407,7 +439,7 @@ def assemble(spec: IntentSpec) -> Circuit:
         return _build_repressible(spec, output)
     if p == "constitutive_expression":
         return _build_constitutive(spec, output)
-    if p in ("logic_and", "logic_or"):
+    if p in ("logic_and", "logic_or", "logic_nand", "logic_nor", "combinatorial_logic"):
         return _build_two_input_gate(spec, output)
     if p == "toggle_switch":
         return _build_toggle_switch(spec, output)

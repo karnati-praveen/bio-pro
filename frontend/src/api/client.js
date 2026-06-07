@@ -31,6 +31,21 @@ export async function fetchPart(partId) {
   return handle(await fetch(`${BASE_URL}/api/parts/${encodeURIComponent(partId)}`));
 }
 
+// ---- Lint (fast parse+validate, no ODE) ----------------------------------- //
+export async function lint(text, organism = null) {
+  try {
+    const res = await fetch(`${BASE_URL}/api/lint`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, organism: organism || null }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 // ---- Compile -------------------------------------------------------------- //
 export async function compile(payload) {
   return handle(
@@ -113,6 +128,34 @@ export async function generateOrder(compileResult) {
   );
 }
 
+// ---- Sequence analysis (Module 2) ----------------------------------------- //
+function postJson(path, body) {
+  return fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(handle);
+}
+
+export const seqParse       = (filename, content) => postJson("/api/sequence/parse", { filename, content });
+export const seqRevComp     = (sequence) => postJson("/api/sequence/revcomp", { sequence });
+export const seqTranslate   = (sequence, frame = 0) => postJson("/api/sequence/translate", { sequence, frame });
+export const seqGC          = (sequence, window = 50) => postJson("/api/sequence/gc", { sequence, window });
+export const seqOrfs        = (sequence, min_len = 90) => postJson("/api/sequence/orfs", { sequence, min_len });
+export const seqRestriction = (sequence, enzymes = null) => postJson("/api/sequence/restriction", { sequence, enzymes });
+
+// ---- Parts library extensions (Module 3) ---------------------------------- //
+export const createPart        = (part) => postJson("/api/parts", part);
+export const importParts       = (filename, content) => postJson("/api/parts/import", { filename, content });
+export const fetchCrossReactivity = () => fetch(`${BASE_URL}/api/parts/cross-reactivity`).then(handle);
+
+// ---- Simulation Workbench (Module 4) -------------------------------------- //
+export const simulateOde   = (compileResult, params) => postJson("/api/simulate", { compile_result: compileResult, params });
+export const sensitivity   = (compileResult) => postJson("/api/simulate/sensitivity", compileResult);
+export const saveSimRun    = (body) => postJson("/api/simulations", body);
+export const listSimRuns   = () => fetch(`${BASE_URL}/api/simulations`).then(handle);
+export const getSimRun     = (id) => fetch(`${BASE_URL}/api/simulations/${id}`).then(handle);
+
 // ---- Designs: save / load / version --------------------------------------- //
 export async function listDesigns() {
   return handle(await fetch(`${BASE_URL}/api/designs`));
@@ -148,6 +191,47 @@ export async function loadVersion(designId, versionNo) {
 
 export function exportVersionUrl(designId, versionNo, format) {
   return `${BASE_URL}/api/designs/${designId}/versions/${versionNo}/export?format=${format}`;
+}
+
+// ---- LLM utilities -------------------------------------------------------- //
+
+/**
+ * Test an LLM provider connection. Returns {ok, latency_ms, model, error}.
+ * Never throws — errors are returned as {ok: false, error: "..."}.
+ */
+export async function testLlmConnection(llmConfig) {
+  try {
+    const res = await fetch(`${BASE_URL}/api/llm/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ llm_config: llmConfig }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, latency_ms: 0, model: llmConfig.model, error: body.detail || `HTTP ${res.status}` };
+    }
+    return res.json();
+  } catch (e) {
+    return { ok: false, latency_ms: 0, model: llmConfig.model, error: e.message };
+  }
+}
+
+/**
+ * Request 2-3 goal reformulation suggestions for an ambiguous/failed compile.
+ * Returns {suggestions: string[]}.
+ */
+export async function suggestGoals(goal, error, organism, llmConfig) {
+  try {
+    const res = await fetch(`${BASE_URL}/api/llm/suggest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal, error, organism: organism || null, llm_config: llmConfig }),
+    });
+    if (!res.ok) return { suggestions: [] };
+    return res.json();
+  } catch {
+    return { suggestions: [] };
+  }
 }
 
 export async function exportInline(response, format) {

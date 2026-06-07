@@ -69,6 +69,29 @@ def test_parse_form_gate_requires_distinct_inducers():
         )
 
 
+def test_parse_nand_gate_text():
+    spec = parser.parse_text("Express GFP when IPTG NAND aTc")
+    assert spec.pattern == "logic_nand"
+    assert {t.inducer for t in spec.triggers} == {"IPTG", "aTc"}
+
+
+def test_parse_nor_gate_text():
+    spec = parser.parse_text("Express RFP when IPTG NOR arabinose")
+    assert spec.pattern == "logic_nor"
+    assert {t.inducer for t in spec.triggers} == {"IPTG", "arabinose"}
+
+
+def test_parse_combinatorial_keeps_all_inducers():
+    spec = parser.parse_text("Combinatorial logic GFP with IPTG and aTc and arabinose")
+    assert spec.pattern == "combinatorial_logic"
+    assert [t.inducer for t in spec.triggers] == ["IPTG", "aTc", "arabinose"]
+
+
+def test_inverted_gate_requires_two_inducers():
+    with pytest.raises(ParseError):
+        parser.parse_text("Express GFP when IPTG NAND")
+
+
 # --------------------------------------------------------------------------- #
 # Assembly
 # --------------------------------------------------------------------------- #
@@ -97,6 +120,25 @@ def test_assemble_and_gate_has_logic_node_and_two_branches():
     assert len(ids) == len(set(ids))
     # three transcription units: two regulator cassettes + output
     assert len(circuit.transcription_units) == 3
+
+
+def test_assemble_nand_gate_inverts_via_internal_repressor():
+    spec = parser.parse_text("Express GFP when IPTG NAND aTc")
+    circuit = assembler.assemble(spec)
+    # inverter node present, repressing the reporter
+    assert any(n.id == "INV" for n in circuit.nodes)
+    assert any(e.source == "INV" and e.target == "GFP" and e.kind == "repression"
+               for e in circuit.edges)
+    result = validate.validate(spec, circuit)
+    assert result.ok
+
+
+def test_assemble_combinatorial_has_three_branches():
+    spec = parser.parse_text("Combinatorial logic GFP with IPTG and aTc and arabinose")
+    circuit = assembler.assemble(spec)
+    gate_inputs = [e for e in circuit.edges if e.target == "GATE"]
+    assert len(gate_inputs) == 3
+    assert validate.validate(spec, circuit).ok
 
 
 # --------------------------------------------------------------------------- #
@@ -146,6 +188,13 @@ def test_and_gate_full_expression_at_end():
     assert rep.values[-1] > rep.values[0]
     # 1 reporter + 2 regulators + 2 inducer inputs = 5 series
     assert len(sim.series) == 5
+
+
+def test_nor_lower_than_or_at_end():
+    # With both inputs on by the end, OR is high and NOR is low (inverse).
+    or_sim = ode.simulate(parser.parse_text("Express GFP when IPTG or aTc are present"))
+    nor_sim = ode.simulate(parser.parse_text("Express GFP when IPTG NOR aTc"))
+    assert _reporter_series(or_sim).values[-1] > _reporter_series(nor_sim).values[-1]
 
 
 def test_tunable_params_scale_output():

@@ -1,7 +1,7 @@
 """FastAPI entrypoint for the Biological Compiler v0.3.0.
 
 Features:
-  - 12-pattern compiler (parse → assemble → validate → simulate)
+  - 15-pattern compiler (parse → assemble → validate → simulate)
   - Real parts database (SQLite-backed, 50+ characterized parts)
   - Host organism support (E. coli / yeast / mammalian)
   - DNA sequence + SBOL export with BioBrick flanking
@@ -30,7 +30,7 @@ from models.schemas import (
     StochasticRequest,
     SweepRequest,
 )
-from compiler import assembler, llm_parser, parser, validate
+from compiler import assembler, llm_compiler, llm_parser, parser, validate
 from compiler.parser import ParseError
 from compiler.assembler import AssemblyError
 from simulation import ode
@@ -41,6 +41,11 @@ import citations as cit_module
 import ordering as ord_module
 import export
 import assembly as asm_module
+from routers import sequence as sequence_router
+from routers import parts as parts_router
+from routers import simulation as simulation_router
+from routers import llm as llm_router
+from routers import lsp as lsp_router
 
 
 @asynccontextmanager
@@ -62,6 +67,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(sequence_router.router)
+app.include_router(parts_router.router)
+app.include_router(simulation_router.router)
+app.include_router(llm_router.router)
+app.include_router(lsp_router.router)
 
 
 # --------------------------------------------------------------------------- #
@@ -180,10 +191,26 @@ def get_part(part_id: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Compile (Features 1–6 integrated)
+# Compile (Features 1–6 integrated + optional LLM layer)
 # --------------------------------------------------------------------------- #
 @app.post("/api/compile", response_model=CompileResponse)
-def compile_circuit(req: CompileRequest) -> CompileResponse:
+async def compile_circuit(req: CompileRequest) -> CompileResponse:
+    if req.llm_config is not None:
+        # LLM-powered path — may raise ParseError with "ambiguous_goal:" prefix
+        try:
+            return await llm_compiler.compile_with_llm(req, fallback_to_rules=True)
+        except ParseError as exc:
+            msg = str(exc)
+            if msg.startswith("ambiguous_goal:"):
+                # Signal the frontend to show the suggestions dialog
+                raise HTTPException(
+                    status_code=422,
+                    detail={"type": "ambiguous_goal", "message": msg[len("ambiguous_goal:"):].strip()},
+                ) from exc
+            raise HTTPException(status_code=400, detail=msg) from exc
+        except AssemblyError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # Rule-based path (unchanged)
     try:
         return _compile_full(req)
     except (ParseError, AssemblyError) as exc:

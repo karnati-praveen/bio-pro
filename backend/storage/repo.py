@@ -10,7 +10,7 @@ from typing import Optional
 from sqlalchemy import select
 
 from storage.db import SessionLocal
-from storage.models import Design, DesignVersion
+from storage.models import Design, DesignVersion, Part, SimulationRun
 
 
 def _next_version_no(session, design_id: int) -> int:
@@ -93,6 +93,61 @@ def get_version(design_id: int, version_no: int) -> Optional[dict]:
             "request": json.loads(version.request_json),
             "response": json.loads(version.response_json),
         }
+
+
+_PART_FIELDS = {
+    "id", "biobrick_id", "name", "type", "role", "regulator", "inducer",
+    "induction_mode", "strength", "description", "color", "sbol_glyph", "seq",
+    "host_compatibility", "kinetic_parameters", "source_doi",
+}
+
+
+def create_part(data: dict) -> dict:
+    """Insert (or replace) a custom part. Returns the stored part as a dict."""
+    fields = {k: v for k, v in data.items() if k in _PART_FIELDS}
+    if not fields.get("id"):
+        raise ValueError("Part requires an 'id'.")
+    if not fields.get("name"):
+        fields["name"] = fields["id"]
+    if not fields.get("type"):
+        raise ValueError("Part requires a 'type'.")
+    fields.setdefault("host_compatibility", ["ecoli"])
+    fields.setdefault("kinetic_parameters", {})
+    with SessionLocal() as session:
+        existing = session.get(Part, fields["id"])
+        if existing:
+            for k, v in fields.items():
+                setattr(existing, k, v)
+            part = existing
+        else:
+            part = Part(**fields)
+            session.add(part)
+        session.commit()
+        return part.to_dict()
+
+
+def save_simulation_run(label: str, mode: str, organism: str | None,
+                        params: dict, summary: dict, design_id: int | None = None) -> dict:
+    with SessionLocal() as session:
+        run = SimulationRun(
+            label=label, mode=mode, organism=organism,
+            params_json=params or {}, summary_json=summary or {}, design_id=design_id,
+        )
+        session.add(run)
+        session.commit()
+        return run.to_dict()
+
+
+def list_simulation_runs(limit: int = 50) -> list[dict]:
+    with SessionLocal() as session:
+        stmt = select(SimulationRun).order_by(SimulationRun.created_at.desc()).limit(limit)
+        return [r.to_dict() for r in session.scalars(stmt)]
+
+
+def get_simulation_run(run_id: int) -> Optional[dict]:
+    with SessionLocal() as session:
+        run = session.get(SimulationRun, run_id)
+        return run.to_dict() if run else None
 
 
 def _design_summary(design: Design) -> dict:

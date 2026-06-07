@@ -1,12 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import App from "./App.jsx";
+import { queryClient } from "./api/queryClient.js";
+import "allotment/dist/style.css";
 import "./styles.css";
 
 // ── Monaco offline worker setup ───────────────────────────────────────────────
-// Import workers via Vite's ?worker suffix so they are bundled as local assets.
-// The Tauri WebView cannot load scripts from external CDNs, so every worker
-// must be available as a same-origin asset at runtime.
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
 self.MonacoEnvironment = {
@@ -15,15 +15,21 @@ self.MonacoEnvironment = {
   },
 };
 
-// Point @monaco-editor/react away from its jsDelivr CDN loader so it uses
-// the monaco-editor package that Vite has already resolved and bundled locally.
 import { loader } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 loader.config({ monaco });
+
+// ── vscode-shim boot ──────────────────────────────────────────────────────────
+// Boot the shim before React renders so any extension activated at startup
+// can register language providers before the first editor mounts.
+import { boot } from "./lib/vscode-shim/boot.js";
+boot(monaco);
 // ─────────────────────────────────────────────────────────────────────────────
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>
 );

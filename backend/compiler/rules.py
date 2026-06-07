@@ -58,6 +58,21 @@ ORTHOGONALITY_WARNINGS: list[tuple[str, str]] = [
     # (repressor_a, repressor_b): these should not be paired without characterisation
 ]
 
+# --------------------------------------------------------------------------- #
+# Cross-reactivity matrix between common regulators (for the Parts Library grid).
+# value: "none" (orthogonal), "weak" (mild off-target), "self" (cognate pair).
+# --------------------------------------------------------------------------- #
+CROSS_REACTIVITY_REGULATORS = ["LacI", "TetR", "AraC", "cI", "cI434", "LuxR"]
+
+CROSS_REACTIVITY_MATRIX: dict[str, dict[str, str]] = {
+    "LacI":  {"LacI": "self", "TetR": "none", "AraC": "none", "cI": "none",  "cI434": "none", "LuxR": "none"},
+    "TetR":  {"LacI": "none", "TetR": "self", "AraC": "none", "cI": "none",  "cI434": "none", "LuxR": "none"},
+    "AraC":  {"LacI": "none", "TetR": "none", "AraC": "self", "cI": "none",  "cI434": "none", "LuxR": "none"},
+    "cI":    {"LacI": "none", "TetR": "none", "AraC": "none", "cI": "self",  "cI434": "weak", "LuxR": "none"},
+    "cI434": {"LacI": "none", "TetR": "none", "AraC": "none", "cI": "weak",  "cI434": "self", "LuxR": "none"},
+    "LuxR":  {"LacI": "none", "TetR": "none", "AraC": "none", "cI": "none",  "cI434": "none", "LuxR": "self"},
+}
+
 
 # --------------------------------------------------------------------------- #
 # Helper functions
@@ -75,6 +90,12 @@ def supported_inducers() -> list[str]:
 # Each entry: list of keyword phrases that signal this pattern
 # --------------------------------------------------------------------------- #
 PATTERN_KEYWORDS: dict[str, list[str]] = {
+    # Inverted / multi-input logic — checked before the generic AND/OR gate path.
+    "logic_nand": [r"\bnand\b", "not.and", "nand gate"],
+    "logic_nor":  [r"\bnor\b", "not.or", "nor gate"],
+    "combinatorial_logic": [
+        "combinatorial", "multi.input", "three.input", "3.input", "multiplex",
+    ],
     "toggle_switch": [
         "toggle", "bistable", "switch", "flip.flop", "genetic switch",
         "two.state", "bistability",

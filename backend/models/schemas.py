@@ -6,6 +6,17 @@ from pydantic import BaseModel, Field, model_validator
 
 
 # --------------------------------------------------------------------------- #
+# LLM configuration (passed from frontend; key never stored server-side)
+# --------------------------------------------------------------------------- #
+class LLMConfig(BaseModel):
+    provider: Literal["anthropic", "openai", "google", "mistral", "ollama"]
+    model: str
+    api_key: Optional[str] = None     # None for ollama; masked in all logs
+    temperature: float = Field(0.2, ge=0.0, le=1.0)
+    ollama_url: Optional[str] = None  # ollama base URL, default http://localhost:11434
+
+
+# --------------------------------------------------------------------------- #
 # Enumerations
 # --------------------------------------------------------------------------- #
 Pattern = Literal[
@@ -21,6 +32,9 @@ Pattern = Literal[
     "feed_forward_loop",
     "band_pass_filter",
     "oscillator",
+    "logic_nand",
+    "logic_nor",
+    "combinatorial_logic",
 ]
 
 Gate = Literal["and", "or"]
@@ -39,6 +53,7 @@ class SimParams(BaseModel):
     k: Optional[float] = Field(None, gt=0, description="Hill half-max constant")
     n: Optional[float] = Field(None, gt=0, description="Hill coefficient (cooperativity)")
     i_max: Optional[float] = Field(None, gt=0, description="inducer level once switched on")
+    duration: Optional[float] = Field(None, gt=0, description="simulation end time override (min)")
 
 
 class FormInput(BaseModel):
@@ -58,6 +73,7 @@ class CompileRequest(BaseModel):
     form: Optional[FormInput] = None
     params: Optional[SimParams] = None
     organism: Optional[HostOrganism] = Field(None, description="Target host organism")
+    llm_config: Optional[LLMConfig] = None  # when set, LLM compiler is used instead of rule-based
 
     @model_validator(mode="after")
     def _one_of(self) -> "CompileRequest":
@@ -222,6 +238,7 @@ class ValidationFinding(BaseModel):
     severity: Literal["error", "warning", "info"]
     message: str
     target: Optional[str] = None
+    fix_suggestion: Optional[str] = None
 
 
 class ValidationResult(BaseModel):
@@ -240,6 +257,13 @@ class CompileResponse(BaseModel):
     trace: list[str]
     citations: list[Citation] = []
     organism: Optional[HostOrganism] = None
+    # LLM metadata — present only when an LLM was used
+    compiler_used: str = "rule_based"          # "llm" | "rule_based" | "llm_fallback"
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
+    llm_tokens: Optional[dict] = None          # {"input": int, "output": int}
+    llm_latency_ms: Optional[int] = None
+    llm_raw_response: Optional[str] = None
 
 
 # Fix forward references

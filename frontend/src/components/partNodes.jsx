@@ -10,20 +10,30 @@ const TYPE_LABEL = {
   rbs: "RBS",
   terminator: "Terminator",
   logic: "Logic gate",
+  operator: "Operator",
+  ribozyme: "Ribozyme",
+  insulator: "Insulator",
+  integrase_site: "Integrase site",
+  reporter: "Reporter",
 };
 
 function BaseNode({ data, shape }) {
+  const isReporter = data.reporter || data.type === "reporter";
   return (
-    <div className={`part-node part-${data.type}`} style={{ borderColor: data.color }}>
+    <div
+      className={`part-node part-${data.type}`}
+      style={{ borderColor: data.color }}
+    >
       <Handle type="target" position={Position.Left} />
       <div className="part-glyph" style={{ background: data.color }}>
         {shape}
+        {isReporter && <span className="reporter-indicator" title="Fluorescent reporter" />}
       </div>
       <div className="part-body">
         <div className="part-label">{data.label}</div>
         <div className="part-type">
           {TYPE_LABEL[data.type] || data.type}
-          {data.reporter ? " · reporter" : ""}
+          {data.reporter && data.type !== "reporter" ? " · reporter" : ""}
         </div>
       </div>
       <Handle type="source" position={Position.Right} />
@@ -36,9 +46,14 @@ const CdsNode = (p) => <BaseNode {...p} shape="▭" />;
 const InducerNode = (p) => <BaseNode {...p} shape="◆" />;
 const RbsNode = (p) => <BaseNode {...p} shape="○" />;
 const TerminatorNode = (p) => <BaseNode {...p} shape="⊤" />;
-
-// The logic gate is not a physical part, so it gets its own glyph (& = AND-ish).
 const LogicNode = (p) => <BaseNode {...p} shape="⋈" />;
+
+// New SBOL part types (Phase 2)
+const OperatorNode = (p) => <BaseNode {...p} shape="▭" />;
+const RibozymeNode = (p) => <BaseNode {...p} shape="✂" />;
+const InsulatorNode = (p) => <BaseNode {...p} shape="‖" />;
+const IntegraseSiteNode = (p) => <BaseNode {...p} shape="⟂" />;
+const ReporterNode = (p) => <BaseNode {...p} shape="★" />;
 
 export const nodeTypes = {
   promoter: PromoterNode,
@@ -47,4 +62,9 @@ export const nodeTypes = {
   rbs: RbsNode,
   terminator: TerminatorNode,
   logic: LogicNode,
+  operator: OperatorNode,
+  ribozyme: RibozymeNode,
+  insulator: InsulatorNode,
+  integrase_site: IntegraseSiteNode,
+  reporter: ReporterNode,
 };
