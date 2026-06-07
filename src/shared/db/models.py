@@ -104,6 +104,20 @@ class SimulationRun(Base):
         }
 
 
+class ChemCache(Base):
+    """Cache of PubChem compound lookups, keyed on '<input_type>:<query>'."""
+
+    __tablename__ = "chem_cache"
+
+    cache_key: Mapped[str] = mapped_column(String(512), primary_key=True)
+    cid: Mapped[int] = mapped_column(Integer, nullable=True)
+    data_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return self.data_json or {}
+
+
 class DesignVersion(Base):
     __tablename__ = "design_versions"
     __table_args__ = (UniqueConstraint("design_id", "version_no"),)

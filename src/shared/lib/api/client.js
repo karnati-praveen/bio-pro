@@ -156,6 +156,22 @@ export const saveSimRun    = (body) => postJson("/api/simulations", body);
 export const listSimRuns   = () => fetch(`${BASE_URL}/api/simulations`).then(handle);
 export const getSimRun     = (id) => fetch(`${BASE_URL}/api/simulations/${id}`).then(handle);
 
+// ---- Chemistry (Module 6) ------------------------------------------------- //
+export const chemProperties  = (query, input_type = "name") => postJson("/api/chem/properties", { query, input_type });
+export const chemPubchem     = (name) => fetch(`${BASE_URL}/api/chem/pubchem/${encodeURIComponent(name)}`).then(handle);
+export const chemIsotopes    = (formula) => postJson("/api/chem/ms-isotopes", { formula });
+export const chemReaction    = (reactants, products, reagents = null) => postJson("/api/chem/reaction-smiles", { reactants, products, reagents });
+export const chemKinetics    = (reactions, species, t_end = 100) => postJson("/api/chem/kinetics", { reactions, species, t_end });
+export function chemSdfUrl()  { return `${BASE_URL}/api/chem/sdf`; }
+export async function chemSdf(query, input_type = "smiles", dim = "3d") {
+  const res = await fetch(`${BASE_URL}/api/chem/sdf`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, input_type, dim }),
+  });
+  if (!res.ok) return null;
+  return res.text();
+}
+
 // ---- Designs: save / load / version --------------------------------------- //
 export async function listDesigns() {
   return handle(await fetch(`${BASE_URL}/api/designs`));

@@ -16,6 +16,7 @@ import AssemblyPanel from "../assembly/AssemblyPanel.jsx";
 import OrderPanel from "../ordering/OrderPanel.jsx";
 import PartsLegend from "../parts/PartsLegend.jsx";
 import DesignsPanel from "./DesignsPanel.jsx";
+import ExportPanel from "../export/ExportPanel.jsx";
 
 const ORGANISMS = [
   { value: "", label: "Any organism" },
@@ -30,6 +31,7 @@ const OUTPUT_TABS = [
   { id: "sweep", label: "Param Sweep" },
   { id: "assembly", label: "Cloning" },
   { id: "order", label: "Order DNA" },
+  { id: "export", label: "Export" },
   { id: "designs", label: "Designs" },
 ];
 
@@ -269,6 +271,11 @@ export default function CircuitEditor({ tabId, tab }) {
               {outputTab === "sweep" && <div className="output-card"><ParameterSweep result={result} /></div>}
               {outputTab === "assembly" && <div className="output-card"><AssemblyPanel result={result} /></div>}
               {outputTab === "order" && <div className="output-card"><OrderPanel result={result} /></div>}
+              {outputTab === "export" && (
+                <div className="output-card">
+                  <ExportPanel result={result} />
+                </div>
+              )}
               {outputTab === "designs" && (
                 <div className="output-card">
                   <DesignsPanel

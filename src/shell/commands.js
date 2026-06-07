@@ -94,6 +94,14 @@ export const COMMANDS = [
     run: () => { const t = tabs().activeTab(); if (t) tabs().closeTab(t.id); },
   },
 
+  // ── Chemistry (Module 6) ──────────────────────────────────────────────
+  { id: "chem.newMolecule", title: "New Molecule", category: "Chemistry",
+    run: () => tabs().openTab({ type: "molecule", title: "molecule.smiles" }) },
+  { id: "chem.newReaction", title: "New Reaction", category: "Chemistry",
+    run: () => tabs().openTab({ type: "reaction", title: "reaction.rxn" }) },
+  { id: "chem.newSpectrum", title: "New Spectrum", category: "Chemistry",
+    run: () => tabs().openTab({ type: "spectrum", title: "spectrum.jdx" }) },
+
   // ── View ──────────────────────────────────────────────────────────────
   { id: "view.toggleSidebar", title: "Toggle Primary Sidebar", category: "View", keybinding: "Ctrl+B",
     run: () => ui().toggleSidebar() },

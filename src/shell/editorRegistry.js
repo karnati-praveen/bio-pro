@@ -1,6 +1,9 @@
 import CircuitEditor from "../modules/compiler/CircuitEditor.jsx";
 import SequenceEditor from "../modules/sequence/SequenceEditor.jsx";
 import SimulationEditor from "../modules/simulation/SimulationEditor.jsx";
+import MoleculeEditor from "../modules/chemistry/MoleculeEditor.jsx";
+import ReactionEditor from "../modules/chemistry/ReactionEditor.jsx";
+import SpectrumEditor from "../modules/chemistry/SpectrumEditor.jsx";
 import PlaceholderEditor from "../shared/ui/PlaceholderEditor.jsx";
 import WebviewEditor from "../shared/ui/WebviewEditor.jsx";
 
@@ -11,9 +14,9 @@ const REGISTRY = {
   sequence: SequenceEditor,
   webview: WebviewEditor,
   simulation: SimulationEditor,
-  molecule: (props) => PlaceholderEditor({ ...props, label: "Molecular Structure Editor", phase: "Phase 4" }),
-  reaction: (props) => PlaceholderEditor({ ...props, label: "Reaction Designer", phase: "Phase 4" }),
-  spectrum: (props) => PlaceholderEditor({ ...props, label: "Spectroscopy Viewer", phase: "Phase 4" }),
+  molecule: MoleculeEditor,
+  reaction: ReactionEditor,
+  spectrum: SpectrumEditor,
   protocol: (props) => PlaceholderEditor({ ...props, label: "Protocol Generator", phase: "Phase 5" }),
   notebook: (props) => PlaceholderEditor({ ...props, label: "Experiment Notebook", phase: "Phase 5" }),
   pathway: (props) => PlaceholderEditor({ ...props, label: "Pathway Designer", phase: "Phase 5" }),

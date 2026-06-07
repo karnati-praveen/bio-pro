@@ -10,7 +10,7 @@ from typing import Optional
 from sqlalchemy import select
 
 from shared.db.db import SessionLocal
-from shared.db.models import Design, DesignVersion, Part, SimulationRun
+from shared.db.models import Design, DesignVersion, Part, SimulationRun, ChemCache
 
 
 def _next_version_no(session, design_id: int) -> int:
@@ -142,6 +142,24 @@ def list_simulation_runs(limit: int = 50) -> list[dict]:
     with SessionLocal() as session:
         stmt = select(SimulationRun).order_by(SimulationRun.created_at.desc()).limit(limit)
         return [r.to_dict() for r in session.scalars(stmt)]
+
+
+def get_chem_cache(cache_key: str) -> Optional[dict]:
+    with SessionLocal() as session:
+        row = session.get(ChemCache, cache_key)
+        return row.to_dict() if row else None
+
+
+def put_chem_cache(cache_key: str, data: dict, cid: int | None = None) -> dict:
+    with SessionLocal() as session:
+        row = session.get(ChemCache, cache_key)
+        if row:
+            row.data_json = data
+            row.cid = cid
+        else:
+            session.add(ChemCache(cache_key=cache_key, data_json=data, cid=cid))
+        session.commit()
+        return data
 
 
 def get_simulation_run(run_id: int) -> Optional[dict]:

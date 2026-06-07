@@ -46,6 +46,7 @@ from modules.parts import api as parts_router
 from modules.simulation import api as simulation_router
 from modules.llm import api as llm_router
 from modules.sequence import lsp as lsp_router
+from modules.chemistry import api as chemistry_router
 
 
 @asynccontextmanager
@@ -73,6 +74,7 @@ app.include_router(parts_router.router)
 app.include_router(simulation_router.router)
 app.include_router(llm_router.router)
 app.include_router(lsp_router.router)
+app.include_router(chemistry_router.router)
 
 
 # --------------------------------------------------------------------------- #

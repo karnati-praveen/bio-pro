@@ -8,3 +8,6 @@ src-tauri/backend-server-dist/
 *.pyc
 *.pyo
 *.db
+
+# personal scratch notes
+prafea.md
