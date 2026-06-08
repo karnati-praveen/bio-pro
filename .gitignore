@@ -11,3 +11,6 @@ src-tauri/backend-server-dist/
 
 # personal scratch notes
 prafea.md
+
+# Vite dependency cache
+src/.vite/

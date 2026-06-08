@@ -4,12 +4,16 @@ import SimulationEditor from "../modules/simulation/SimulationEditor.jsx";
 import MoleculeEditor from "../modules/chemistry/MoleculeEditor.jsx";
 import ReactionEditor from "../modules/chemistry/ReactionEditor.jsx";
 import SpectrumEditor from "../modules/chemistry/SpectrumEditor.jsx";
+import ProtocolEditor from "../modules/protocol/ProtocolEditor.jsx";
+import NotebookEditor from "../modules/experiments/NotebookEditor.jsx";
+import PathwayEditor from "../modules/pathway/PathwayEditor.jsx";
+import PrimersEditor from "../modules/primers/PrimersEditor.jsx";
+import WelcomeEditor from "../modules/welcome/WelcomeEditor.jsx";
 import PlaceholderEditor from "../shared/ui/PlaceholderEditor.jsx";
 import WebviewEditor from "../shared/ui/WebviewEditor.jsx";
 
-// Maps a tab's `type` to the editor component that renders it. Later phases
-// replace the placeholders with SequenceEditor, MoleculeEditor, etc.
 const REGISTRY = {
+  welcome: WelcomeEditor,
   circuit: CircuitEditor,
   sequence: SequenceEditor,
   webview: WebviewEditor,
@@ -17,9 +21,10 @@ const REGISTRY = {
   molecule: MoleculeEditor,
   reaction: ReactionEditor,
   spectrum: SpectrumEditor,
-  protocol: (props) => PlaceholderEditor({ ...props, label: "Protocol Generator", phase: "Phase 5" }),
-  notebook: (props) => PlaceholderEditor({ ...props, label: "Experiment Notebook", phase: "Phase 5" }),
-  pathway: (props) => PlaceholderEditor({ ...props, label: "Pathway Designer", phase: "Phase 5" }),
+  protocol: ProtocolEditor,
+  notebook: NotebookEditor,
+  pathway: PathwayEditor,
+  primers: PrimersEditor,
 };
 
 export function resolveEditor(type) {

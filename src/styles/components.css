@@ -1,0 +1,255 @@
+/* ╔══════════════════════════════════════════════════════════════════════════╗
+   ║  BioIDE Component Primitives — use these everywhere, not inline styles  ║
+   ╚══════════════════════════════════════════════════════════════════════════╝ */
+
+/* ── Button ───────────────────────────────────────────────────────────────── */
+.bio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.bio-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+.bio-btn:active:not(:disabled) { opacity: 0.85; }
+.bio-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.bio-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.bio-btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.bio-btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.bio-btn.ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: transparent;
+}
+
+.bio-btn.danger {
+  background: var(--error-bg);
+  border-color: var(--error);
+  color: var(--error);
+}
+.bio-btn.danger:hover:not(:disabled) {
+  background: var(--error);
+  color: #fff;
+}
+
+.bio-btn.sm { padding: 3px 10px; font-size: var(--text-sm); }
+.bio-btn.xs { padding: 2px 7px;  font-size: var(--text-xs); }
+.bio-btn.lg { padding: 9px 20px; font-size: var(--text-md); }
+
+/* ── Input / Select / Textarea ───────────────────────────────────────────── */
+.bio-input,
+.bio-select,
+.bio-textarea {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast);
+  outline: none;
+}
+.bio-input:focus,
+.bio-select:focus,
+.bio-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+.bio-input::placeholder,
+.bio-textarea::placeholder { color: var(--text-faint); }
+
+.bio-textarea { resize: vertical; line-height: 1.5; min-height: 80px; }
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.bio-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+.bio-card.elevated {
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+}
+
+/* ── Section header ───────────────────────────────────────────────────────── */
+.bio-section-header {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: var(--space-2) 0 var(--space-1);
+  margin: 0;
+}
+
+/* ── Badge / Chip ─────────────────────────────────────────────────────────── */
+.bio-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semi);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.bio-badge.success { background: var(--success-bg); color: var(--success); }
+.bio-badge.warning { background: var(--warning-bg); color: var(--warning); }
+.bio-badge.error   { background: var(--error-bg);   color: var(--error);   }
+.bio-badge.info    { background: var(--info-bg);     color: var(--info);    }
+.bio-badge.neutral { background: var(--surface-2);  color: var(--text-muted); border-color: var(--border); }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.bio-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  color: var(--text-faint);
+  text-align: center;
+  height: 100%;
+  min-height: 160px;
+}
+.bio-empty-icon {
+  font-size: 36px;
+  opacity: 0.6;
+  line-height: 1;
+}
+.bio-empty-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semi);
+  color: var(--text-muted);
+  margin: 0;
+}
+.bio-empty-hint {
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+  max-width: 280px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Tooltip wrapper (pure CSS, no JS) ───────────────────────────────────── */
+.bio-tooltip-wrap { position: relative; display: inline-flex; }
+.bio-tooltip-wrap::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%; bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 999;
+  box-shadow: var(--shadow-1);
+}
+.bio-tooltip-wrap:hover::after { opacity: 1; }
+
+/* ── Toast container & items ──────────────────────────────────────────────── */
+.bio-toast-container {
+  position: fixed;
+  bottom: 32px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 9999;
+  pointer-events: none;
+  max-width: 360px;
+}
+.bio-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-base);
+  box-shadow: var(--shadow-2);
+  pointer-events: all;
+  animation: toast-in 180ms ease forwards;
+}
+.bio-toast.success { border-color: var(--success); background: var(--success-bg); color: var(--success); }
+.bio-toast.error   { border-color: var(--error);   background: var(--error-bg);   color: var(--error);   }
+.bio-toast.warning { border-color: var(--warning); background: var(--warning-bg); color: var(--warning); }
+.bio-toast.info    { border-color: var(--info);    background: var(--info-bg);    color: var(--info);    }
+.bio-toast-msg { flex: 1; font-size: var(--text-sm); line-height: 1.4; }
+.bio-toast-dismiss {
+  background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1;
+  color: inherit; opacity: 0.6; padding: 0 2px;
+  flex-shrink: 0;
+}
+.bio-toast-dismiss:hover { opacity: 1; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Consistent table ─────────────────────────────────────────────────────── */
+.bio-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.bio-table th {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semi);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.bio-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.bio-table tr:last-child td { border-bottom: none; }
+.bio-table tr:hover td { background: var(--surface-2); }

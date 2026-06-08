@@ -1,0 +1,191 @@
+/* ╔══════════════════════════════════════════════════════════════════════════╗
+   ║  BioIDE Design Tokens — single source of truth for all CSS variables    ║
+   ╚══════════════════════════════════════════════════════════════════════════╝ */
+
+/* ── Dark theme (default) ─────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  /* Surfaces */
+  --bg:            #0d1117;
+  --bg-elevated:   #13161c;
+  --surface:       #161b22;
+  --surface-2:     #1c2128;
+  --surface-3:     #21262d;
+
+  /* Borders */
+  --border:        #30363d;
+  --border-strong: #484f58;
+
+  /* Text */
+  --text:          #e6edf3;
+  --text-muted:    #8b949e;
+  --text-faint:    #6e7681;
+
+  /* Accent — vivid teal */
+  --accent:        #2ec4b6;
+  --accent-hover:  #3dd4c5;
+  --accent-subtle: rgba(46, 196, 182, 0.12);
+
+  /* Status colors */
+  --success:       #3fb950;
+  --success-bg:    rgba(63, 185, 80, 0.12);
+  --warning:       #d29922;
+  --warning-bg:    rgba(210, 153, 34, 0.12);
+  --error:         #f85149;
+  --error-bg:      rgba(248, 81, 73, 0.12);
+  --info:          #58a6ff;
+  --info-bg:       rgba(88, 166, 255, 0.12);
+
+  /* Feature accent palette — vivid on dark backgrounds */
+  --ft-circuit:    #6bcf9a;
+  --ft-sequence:   #6bcf9a;
+  --ft-chemistry:  #b57bee;
+  --ft-simulation: #5ba8f5;
+  --ft-protocol:   #f9b87d;
+  --ft-pathway:    #4dd8cc;
+  --ft-notebook:   #f0d47d;
+
+  /* Shell chrome */
+  --chrome:        #161b22;
+  --chrome-fg:     #cdd9e5;
+  --chrome-border: #30363d;
+  --chrome-hover:  #21262d;
+  --chrome-active: rgba(46, 196, 182, 0.14);
+
+  /* Status bar */
+  --statusbar-bg:  #0f5c50;
+  --statusbar-fg:  #c8f0ea;
+
+  /* Editor */
+  --editor-bg:     #0d1117;
+
+  /* Backwards-compat aliases used throughout existing styles.css */
+  --card:      var(--surface);
+  --ink:       var(--text);
+  --muted:     var(--text-muted);
+  --status-bg: var(--statusbar-bg);
+  --status-fg: var(--statusbar-fg);
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg:            #f3f6f9;
+  --bg-elevated:   #f8fafb;
+  --surface:       #ffffff;
+  --surface-2:     #f0f4f7;
+  --surface-3:     #e4ecf1;
+
+  --border:        #d8e2ea;
+  --border-strong: #b0c0cc;
+
+  --text:          #1a2433;
+  --text-muted:    #5a6b7a;
+  --text-faint:    #8a9bb0;
+
+  --accent:        #1a9e90;
+  --accent-hover:  #13857a;
+  --accent-subtle: rgba(26, 158, 144, 0.08);
+
+  --success:       #1d7a38;
+  --success-bg:    rgba(29, 122, 56, 0.08);
+  --warning:       #976c00;
+  --warning-bg:    rgba(151, 108, 0, 0.08);
+  --error:         #c0202e;
+  --error-bg:      rgba(192, 32, 46, 0.08);
+  --info:          #0460c8;
+  --info-bg:       rgba(4, 96, 200, 0.08);
+
+  --ft-circuit:    #1a7a40;
+  --ft-sequence:   #1a7a40;
+  --ft-chemistry:  #6d24cc;
+  --ft-simulation: #1e54c4;
+  --ft-protocol:   #b85c0a;
+  --ft-pathway:    #0d6e65;
+  --ft-notebook:   #9a5e00;
+
+  --chrome:        #2c3e50;
+  --chrome-fg:     #dce8f0;
+  --chrome-border: #3d5166;
+  --chrome-hover:  rgba(255, 255, 255, 0.08);
+  --chrome-active: rgba(46, 196, 182, 0.18);
+
+  --statusbar-bg:  #1a9e90;
+  --statusbar-fg:  #ffffff;
+
+  --editor-bg:     #ffffff;
+
+  --card:      var(--surface);
+  --ink:       var(--text);
+  --muted:     var(--text-muted);
+  --status-bg: var(--statusbar-bg);
+  --status-fg: var(--statusbar-fg);
+}
+
+/* ── Color-blind safe palette override ───────────────────────────────────── */
+[data-palette="colorblind"] {
+  --accent:        #0072b2;
+  --accent-hover:  #005c8f;
+  --accent-subtle: rgba(0, 114, 178, 0.12);
+  --ft-circuit:    #009e73;
+  --ft-sequence:   #009e73;
+  --ft-chemistry:  #cc79a7;
+  --ft-simulation: #0072b2;
+  --ft-protocol:   #e69f00;
+  --ft-pathway:    #56b4e9;
+  --ft-notebook:   #d55e00;
+  --statusbar-bg:  #0072b2;
+  --status-bg:     #0072b2;
+}
+
+/* ── Spacing scale (4-point grid) ─────────────────────────────────────────── */
+:root {
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  48px;
+
+  /* Border radius */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   10px;
+  --radius-xl:   14px;
+  --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.16), 0 1px 2px rgba(0,0,0,0.1);
+  --shadow-2: 0 4px 14px rgba(0,0,0,0.24), 0 2px 6px rgba(0,0,0,0.14);
+  --shadow-3: 0 12px 40px rgba(0,0,0,0.38), 0 4px 14px rgba(0,0,0,0.22);
+
+  /* Typography */
+  --font-ui:   "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Fira Mono", "Cascadia Code", "Consolas", "SF Mono", monospace;
+
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   15px;
+  --text-xl:   18px;
+  --text-2xl:  24px;
+  --text-3xl:  32px;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semi:   600;
+  --weight-bold:   700;
+
+  /* Motion — respect prefers-reduced-motion via media query below */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+  }
+}

@@ -6,7 +6,9 @@ export const isTauri = typeof window !== "undefined" && !!window.__TAURI__;
 
 const PROJECT_EXTS = [
   ".biopro", ".sbol", ".gb", ".gbk", ".fasta", ".fa",
-  ".mol", ".sdf", ".smiles", ".protocol", ".sim", ".pathway", ".notebook",
+  ".mol", ".sdf", ".smiles", ".smi", ".rxn",
+  ".jdx", ".dx",
+  ".protocol", ".sim", ".pathway", ".notebook",
 ];
 
 const isProjectFile = (name) =>

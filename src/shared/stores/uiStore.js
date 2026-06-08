@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+let _toastSeq = 0;
+
 export const useUiStore = create((set, get) => ({
   theme: "dark",
   colorBlind: false,
@@ -11,6 +13,9 @@ export const useUiStore = create((set, get) => ({
   bottomTab: "problems",
   paletteOpen: false,
   status: "Ready",
+
+  // ── Toast notifications ────────────────────────────────────────────────────
+  toasts: [],
 
   // ── Extension-contributed dynamic lists ────────────────────────────────────
   // Activity bar items added by extensions: [{ id, title, iconId? }]
@@ -36,6 +41,17 @@ export const useUiStore = create((set, get) => ({
   setTheme: (theme) => set({ theme }),
   toggleTheme: () => set((s) => ({ theme: s.theme === "dark" ? "light" : "dark" })),
   toggleColorBlind: () => set((s) => ({ colorBlind: !s.colorBlind })),
+
+  addToast(message, type = "info", duration = 3500) {
+    const id = ++_toastSeq;
+    set((s) => ({ toasts: [...s.toasts, { id, message, type }] }));
+    if (duration > 0) {
+      setTimeout(() => get().removeToast(id), duration);
+    }
+  },
+  removeToast(id) {
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+  },
 
   setActivity: (activeActivity) =>
     set((s) =>

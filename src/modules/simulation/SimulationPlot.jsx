@@ -1,6 +1,8 @@
 import { useState } from "react";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -11,6 +13,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useCircuitStore } from "../../shared/stores/circuitStore.js";
+import { useTabStore } from "../../shared/stores/tabStore.js";
 
 const FALLBACK_COLORS = ["#52b788", "#ffb703", "#cdb4db", "#e63946"];
 
@@ -59,7 +63,7 @@ function DeterministicChart({ simulation }) {
 }
 
 // Stochastic simulation chart with shaded percentile band
-function StochasticChart({ stochastic, threshold }) {
+export function StochasticChart({ stochastic, threshold }) {
   if (!stochastic) return <div className="panel-empty">Run stochastic simulation to see results.</div>;
 
   const reporter = stochastic.series.find(s => s.is_reporter) || stochastic.series[0];
@@ -157,9 +161,88 @@ function StochasticChart({ stochastic, threshold }) {
   );
 }
 
+function StochasticInlineChart({ stochastic }) {
+  const data = stochastic.t.map((t, i) => {
+    const row = { t: Number(t.toFixed(1)) };
+    stochastic.series.forEach(s => {
+      row[`${s.name}_p10`] = s.p10[i];
+      row[`${s.name}_band`] = s.p90[i] - s.p10[i];
+      row[`${s.name}_mean`] = s.mean[i];
+    });
+    return row;
+  });
+
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <ComposedChart data={data} margin={{ top: 8, right: 24, bottom: 24, left: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef2f4" />
+        <XAxis
+          dataKey="t"
+          label={{ value: "time (a.u.)", position: "insideBottom", offset: -10 }}
+          tick={{ fontSize: 11 }}
+        />
+        <YAxis
+          label={{
+            value: "molecules (a.u.)",
+            angle: -90,
+            position: "insideLeft",
+            style: { textAnchor: "middle" },
+          }}
+          tick={{ fontSize: 11 }}
+        />
+        <Tooltip formatter={(v, name) => [v?.toFixed ? v.toFixed(2) : v, name]} />
+        <Legend />
+        {stochastic.series.flatMap((s, i) => {
+          const color = FALLBACK_COLORS[i % FALLBACK_COLORS.length];
+          const stackId = `band_${s.name}`;
+          return [
+            <Area
+              key={`${s.name}_base`}
+              type="monotone"
+              dataKey={`${s.name}_p10`}
+              stackId={stackId}
+              stroke="none"
+              fill="transparent"
+              legendType="none"
+              isAnimationActive={false}
+            />,
+            <Area
+              key={`${s.name}_cap`}
+              type="monotone"
+              dataKey={`${s.name}_band`}
+              stackId={stackId}
+              stroke="none"
+              fill={color}
+              fillOpacity={0.15}
+              name={`${s.name} p10–p90`}
+              isAnimationActive={false}
+            />,
+            <Line
+              key={`${s.name}_mean`}
+              type="monotone"
+              dataKey={`${s.name}_mean`}
+              stroke={color}
+              strokeWidth={2}
+              dot={false}
+              name={`${s.name} mean`}
+              isAnimationActive={false}
+            />,
+          ];
+        })}
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
 export default function SimulationPlot({ simulation, stochastic, onRunStochastic, stochLoading }) {
   const [mode, setMode] = useState("deterministic");
   const [threshold, setThreshold] = useState("");
+
+  const activeTab = useTabStore((s) => s.activeTab());
+  const storeStochastic = useCircuitStore((s) => {
+    if (!activeTab || activeTab.type !== "circuit") return null;
+    return (s.byTab[activeTab.id] ?? {}).stochastic ?? null;
+  });
 
   if (!simulation) {
     return <div className="panel-empty">Simulation will appear here after compiling.</div>;
@@ -216,6 +299,13 @@ export default function SimulationPlot({ simulation, stochastic, onRunStochastic
           <StochasticChart stochastic={stochastic} threshold={thresholdNum} />
         )}
       </div>
+
+      {storeStochastic && (
+        <div className="stoch-inline-section">
+          <h3 className="stoch-inline-heading">Stochastic Simulation</h3>
+          <StochasticInlineChart stochastic={storeStochastic} />
+        </div>
+      )}
     </div>
   );
 }

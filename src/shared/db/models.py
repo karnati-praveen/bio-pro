@@ -104,6 +104,33 @@ class SimulationRun(Base):
         }
 
 
+class Experiment(Base):
+    """A wet-lab experiment notebook entry linking an in-silico design to results."""
+
+    __tablename__ = "experiments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    design_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    exp_type: Mapped[str] = mapped_column(String(64), default="expression")
+    date: Mapped[str] = mapped_column(String(32), nullable=True)
+    protocol_ref: Mapped[str] = mapped_column(String(200), nullable=True)
+    columns_json: Mapped[list] = mapped_column(JSON, default=list)
+    rows_json: Mapped[list] = mapped_column(JSON, default=list)
+    notes_md: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "title": self.title, "design_id": self.design_id,
+            "exp_type": self.exp_type, "date": self.date, "protocol_ref": self.protocol_ref,
+            "columns": self.columns_json or [], "rows": self.rows_json or [],
+            "notes_md": self.notes_md or "", "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
 class ChemCache(Base):
     """Cache of PubChem compound lookups, keyed on '<input_type>:<query>'."""
 

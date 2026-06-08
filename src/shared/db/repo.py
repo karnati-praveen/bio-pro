@@ -8,9 +8,10 @@ import json
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from shared.db.db import SessionLocal
-from shared.db.models import Design, DesignVersion, Part, SimulationRun, ChemCache
+from shared.db.models import Design, DesignVersion, Part, SimulationRun, ChemCache, Experiment
 
 
 def _next_version_no(session, design_id: int) -> int:
@@ -56,15 +57,19 @@ def add_version(design_id: int, request: dict, response: dict) -> Optional[dict]
 
 def list_designs(owner_email: Optional[str] = None) -> list[dict]:
     with SessionLocal() as session:
-        stmt = select(Design).order_by(Design.updated_at.desc())
+        stmt = select(Design).options(joinedload(Design.versions)).order_by(Design.updated_at.desc())
         if owner_email:
             stmt = stmt.where(Design.owner_email == owner_email)
-        return [_design_summary(d) for d in session.scalars(stmt)]
+        return [_design_summary(d) for d in session.scalars(stmt).unique()]
 
 
 def get_design(design_id: int) -> Optional[dict]:
     with SessionLocal() as session:
-        design = session.get(Design, design_id)
+        design = session.scalar(
+            select(Design)
+            .where(Design.id == design_id)
+            .options(joinedload(Design.versions))
+        )
         if design is None:
             return None
         summary = _design_summary(design)
@@ -142,6 +147,57 @@ def list_simulation_runs(limit: int = 50) -> list[dict]:
     with SessionLocal() as session:
         stmt = select(SimulationRun).order_by(SimulationRun.created_at.desc()).limit(limit)
         return [r.to_dict() for r in session.scalars(stmt)]
+
+
+def create_experiment(data: dict) -> dict:
+    fields = {k: data[k] for k in
+              ("title", "design_id", "exp_type", "date", "protocol_ref", "notes_md")
+              if k in data}
+    fields["columns_json"] = data.get("columns", [])
+    fields["rows_json"] = data.get("rows", [])
+    with SessionLocal() as session:
+        exp = Experiment(**fields)
+        session.add(exp)
+        session.commit()
+        return exp.to_dict()
+
+
+def update_experiment(exp_id: int, data: dict) -> Optional[dict]:
+    with SessionLocal() as session:
+        exp = session.get(Experiment, exp_id)
+        if exp is None:
+            return None
+        for k in ("title", "design_id", "exp_type", "date", "protocol_ref", "notes_md"):
+            if k in data:
+                setattr(exp, k, data[k])
+        if "columns" in data:
+            exp.columns_json = data["columns"]
+        if "rows" in data:
+            exp.rows_json = data["rows"]
+        session.commit()
+        return exp.to_dict()
+
+
+def list_experiments() -> list[dict]:
+    with SessionLocal() as session:
+        stmt = select(Experiment).order_by(Experiment.updated_at.desc())
+        return [e.to_dict() for e in session.scalars(stmt)]
+
+
+def get_experiment(exp_id: int) -> Optional[dict]:
+    with SessionLocal() as session:
+        exp = session.get(Experiment, exp_id)
+        return exp.to_dict() if exp else None
+
+
+def delete_experiment(exp_id: int) -> bool:
+    with SessionLocal() as session:
+        exp = session.get(Experiment, exp_id)
+        if exp is None:
+            return False
+        session.delete(exp)
+        session.commit()
+        return True
 
 
 def get_chem_cache(cache_key: str) -> Optional[dict]:

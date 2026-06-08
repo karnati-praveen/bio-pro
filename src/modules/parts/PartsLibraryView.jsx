@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FixedSizeList } from "react-window";
 import { usePartsStore } from "../../shared/stores/partsStore.js";
 import { useUiStore } from "../../shared/stores/uiStore.js";
 
@@ -20,13 +21,41 @@ export default function PartsLibraryView() {
   const [showForm, setShowForm] = useState(false);
   const [showCross, setShowCross] = useState(false);
   const [form, setForm] = useState({ id: "", name: "", type: "promoter", seq: "" });
+  const [listHeight, setListHeight] = useState(400);
   const fileRef = useRef(null);
+  const listContainerRef = useRef(null);
 
   useEffect(() => { fetch(); }, [fetch]);
   useEffect(() => { if (showCross) loadCrossReactivity(); }, [showCross, loadCrossReactivity]);
 
+  useEffect(() => {
+    const el = listContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setListHeight(entry.contentRect.height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const onSelect = (id) => { select(id); if (!secondaryVisible) toggleSecondary(); };
   const results = parts ? filtered() : [];
+
+  const Row = useCallback(({ index, style }) => {
+    const p = results[index];
+    return (
+      <div style={{ ...style, paddingBottom: 4 }}>
+        <li className={`part-item${selectedPartId === p.id ? " selected" : ""}`}
+          onClick={() => onSelect(p.id)}>
+          <div className="part-name">{p.name}</div>
+          <div className="part-tags">
+            <span className="part-tag">{p.type}</span>
+            {p.role && <span className="part-tag role">{p.role}</span>}
+            {(p.host_compatibility || []).slice(0, 1).map((h) => <span key={h} className="part-tag host">{h}</span>)}
+          </div>
+        </li>
+      </div>
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results, selectedPartId]);
 
   const submitForm = async (e) => {
     e.preventDefault();
@@ -51,7 +80,7 @@ export default function PartsLibraryView() {
   };
 
   return (
-    <div className="parts-library">
+    <div className="parts-library" style={{ height: "100%", overflow: "hidden" }}>
       <input className="parts-search" placeholder="Search parts…"
         value={filters.query} onChange={(e) => setFilter("query", e.target.value)} />
       <div className="parts-filters">
@@ -112,20 +141,22 @@ export default function PartsLibraryView() {
       {loading && <div className="panel-empty">Loading parts…</div>}
       {error && <div className="explorer-error">{error}</div>}
 
-      <ul className="parts-list">
-        {results.map((p) => (
-          <li key={p.id} className={`part-item${selectedPartId === p.id ? " selected" : ""}`}
-            onClick={() => onSelect(p.id)}>
-            <div className="part-name">{p.name}</div>
-            <div className="part-tags">
-              <span className="part-tag">{p.type}</span>
-              {p.role && <span className="part-tag role">{p.role}</span>}
-              {(p.host_compatibility || []).slice(0, 1).map((h) => <span key={h} className="part-tag host">{h}</span>)}
-            </div>
-          </li>
-        ))}
-        {parts && results.length === 0 && <li className="explorer-empty">No matching parts</li>}
-      </ul>
+      <div ref={listContainerRef} style={{ flex: 1, minHeight: 0 }}>
+        {parts && results.length === 0
+          ? <div className="explorer-empty">No matching parts</div>
+          : (
+            <FixedSizeList
+              height={listHeight}
+              itemCount={results.length}
+              itemSize={58}
+              width="100%"
+              style={{ listStyle: "none", margin: 0, padding: 0 }}
+            >
+              {Row}
+            </FixedSizeList>
+          )
+        }
+      </div>
     </div>
   );
 }

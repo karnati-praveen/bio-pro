@@ -172,6 +172,58 @@ export async function chemSdf(query, input_type = "smiles", dim = "3d") {
   return res.text();
 }
 
+// ---- Primer design (Module 8) --------------------------------------------- //
+export const designPrimers = (sequence, opts = {}) => postJson("/api/primers/design", { sequence, ...opts });
+
+// ---- Protocol generator (Module 7) ---------------------------------------- //
+export const generateProtocol = (compileResult, method = "gibson") =>
+  postJson("/api/protocol", { compile_result: compileResult, method });
+
+// ---- Cloning map (Module 8) ----------------------------------------------- //
+export const getCloningMap = (compileResult, method = "gibson", topology = "linear") =>
+  postJson("/api/protocol/cloning-map", { compile_result: compileResult, method, topology });
+
+// ---- Pathway / FBA (Module 12) -------------------------------------------- //
+export const runFba          = (metabolites, reactions, objective) => postJson("/api/pathway/fba", { metabolites, reactions, objective });
+export const listPathwayTemplates = () => fetch(`${BASE_URL}/api/pathway/templates`).then(handle);
+export const getPathwayTemplate   = (id) => fetch(`${BASE_URL}/api/pathway/templates/${id}`).then(handle);
+
+// ---- Experiment tracker (Module 10) --------------------------------------- //
+export const listExperiments  = () => fetch(`${BASE_URL}/api/experiments`).then(handle);
+export const getExperiment    = (id) => fetch(`${BASE_URL}/api/experiments/${id}`).then(handle);
+export const createExperiment = (body) => postJson("/api/experiments", body);
+export const updateExperiment = (id, body) => fetch(`${BASE_URL}/api/experiments/${id}`, {
+  method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+}).then(handle);
+export const deleteExperiment = (id) => fetch(`${BASE_URL}/api/experiments/${id}`, { method: "DELETE" }).then(handle);
+export const fitExperiment    = (simulation, measured) => postJson("/api/experiments/fit", { simulation, measured });
+
+// ---- Git / Version control (Module 9) ------------------------------------ //
+function gitPost(path, body) {
+  return fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(handle);
+}
+
+export const gitInit        = (root) => gitPost("/api/git/init", { root });
+export const gitStatus      = (root) => gitPost("/api/git/status", { root });
+export const gitStage       = (root, files, stage = true) => gitPost("/api/git/stage", { root, files, stage });
+export const gitCommit      = (root, message, files = null) => gitPost("/api/git/commit", { root, message, files });
+export const gitLog         = (root) => gitPost("/api/git/log", { root });
+export const gitFileLog     = (root, filepath) => gitPost("/api/git/log/file", { root, filepath });
+export const gitDiff        = (root, filepath, ref_a = null, ref_b = null) =>
+  gitPost("/api/git/diff", { root, filepath, ref_a, ref_b });
+export const gitRestore     = (root, filepath, commit) => gitPost("/api/git/restore", { root, filepath, commit });
+export const gitBranches    = (root) => gitPost("/api/git/branches", { root });
+export const gitCreateBranch = (root, name) => gitPost("/api/git/branch/create", { root, name });
+export const gitCheckout    = (root, branch) => gitPost("/api/git/branch/checkout", { root, branch });
+export const gitMerge       = (root, branch) => gitPost("/api/git/branch/merge", { root, branch });
+export const gitPush        = (root, remote = "origin", branch = null) => gitPost("/api/git/push", { root, remote, branch });
+export const gitPull        = (root, remote = "origin", branch = null) => gitPost("/api/git/pull", { root, remote, branch });
+export const gitSuggestMessage = (root, files) => gitPost("/api/git/suggest-message", { root, files });
+
 // ---- Designs: save / load / version --------------------------------------- //
 export async function listDesigns() {
   return handle(await fetch(`${BASE_URL}/api/designs`));
@@ -203,6 +255,10 @@ export async function getDesign(designId) {
 
 export async function loadVersion(designId, versionNo) {
   return handle(await fetch(`${BASE_URL}/api/designs/${designId}/versions/${versionNo}`));
+}
+
+export async function diffVersions(designId, a, b) {
+  return handle(await fetch(`${BASE_URL}/api/designs/${designId}/versions/${a}/diff/${b}`));
 }
 
 export function exportVersionUrl(designId, versionNo, format) {

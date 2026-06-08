@@ -2,8 +2,10 @@
 // the displayed result to standard formats (GenBank / FASTA / SBOL / JSON).
 
 import { useEffect, useState } from "react";
+import { DiffEditor } from "@monaco-editor/react";
 import {
   addVersion,
+  diffVersions,
   exportInline,
   listDesigns,
   loadVersion,
@@ -15,13 +17,56 @@ const FORMATS = ["genbank", "fasta", "sbol", "json"];
 export default function DesignsPanel({ result, request, onLoad }) {
   const [designs, setDesigns] = useState([]);
   const [name, setName] = useState("");
-  const [activeId, setActiveId] = useState(null); // design currently being edited
+  const [activeId, setActiveId] = useState(null);
   const [status, setStatus] = useState(null);
 
+  // { designId: number, versions: number[] } — at most 2 versions from the same design
+  const [diffSel, setDiffSel] = useState({ designId: null, versions: [] });
+  const [diffData, setDiffData] = useState(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+
   const refresh = () => listDesigns().then(setDesigns).catch(() => {});
+  useEffect(() => { refresh(); }, []);
+
+  // Fetch diff whenever two versions are selected for the same design
   useEffect(() => {
-    refresh();
-  }, []);
+    if (diffSel.versions.length !== 2) { setDiffData(null); return; }
+    const [a, b] = [...diffSel.versions].sort((x, y) => x - y);
+    setDiffLoading(true);
+    setDiffData(null);
+    diffVersions(diffSel.designId, a, b)
+      .then(setDiffData)
+      .catch((e) => setStatus(e.message))
+      .finally(() => setDiffLoading(false));
+  }, [diffSel]);
+
+  const handleToggleVersion = (designId, versionNo) => {
+    setDiffSel((prev) => {
+      if (prev.designId !== designId) {
+        // Different design — start fresh
+        return { designId, versions: [versionNo] };
+      }
+      const already = prev.versions.includes(versionNo);
+      if (already) {
+        return { ...prev, versions: prev.versions.filter((v) => v !== versionNo) };
+      }
+      // Keep at most 2; drop the oldest when adding a third
+      const next = [...prev.versions, versionNo].slice(-2);
+      return { ...prev, versions: next };
+    });
+  };
+
+  const handleCompareWithPrev = (designId, versionNo) => {
+    setDiffSel({ designId, versions: [versionNo - 1, versionNo] });
+  };
+
+  const closeDiff = () => {
+    setDiffSel({ designId: null, versions: [] });
+    setDiffData(null);
+  };
+
+  const isChecked = (designId, versionNo) =>
+    diffSel.designId === designId && diffSel.versions.includes(versionNo);
 
   const handleSave = async () => {
     if (!result) return;
@@ -50,6 +95,13 @@ export default function DesignsPanel({ result, request, onLoad }) {
       setStatus(e.message);
     }
   };
+
+  const showDiff = diffData || diffLoading;
+  const [olderV, newerV] = [...diffSel.versions].sort((x, y) => x - y);
+  const nd = diffData?.node_diff;
+  const diffSummary = nd
+    ? `${nd.added.length} node${nd.added.length !== 1 ? "s" : ""} added, ${nd.removed.length} removed, ${nd.changed.length} changed`
+    : null;
 
   return (
     <div className="designs-panel">
@@ -93,14 +145,61 @@ export default function DesignsPanel({ result, request, onLoad }) {
               <span className="designs-name">{d.name}</span>
               <span className="designs-versions">
                 {Array.from({ length: d.latest_version }, (_, i) => i + 1).map((v) => (
-                  <button key={v} className="link-btn" onClick={() => handleLoad(d.id, v)}>
-                    v{v}
-                  </button>
+                  <span key={v} className="designs-version-item">
+                    <input
+                      type="checkbox"
+                      className="version-check"
+                      checked={isChecked(d.id, v)}
+                      onChange={() => handleToggleVersion(d.id, v)}
+                      title={`Select v${v} for comparison`}
+                    />
+                    <button className="link-btn" onClick={() => handleLoad(d.id, v)}>
+                      v{v}
+                    </button>
+                    {v > 1 && (
+                      <button
+                        className="link-btn version-diff-link"
+                        onClick={() => handleCompareWithPrev(d.id, v)}
+                        title={`Compare v${v - 1} → v${v}`}
+                      >
+                        ↔
+                      </button>
+                    )}
+                  </span>
                 ))}
               </span>
             </li>
           ))}
         </ul>
+      )}
+
+      {showDiff && (
+        <div className="version-diff">
+          <div className="version-diff-header">
+            <span className="version-diff-title">
+              {diffSel.versions.length === 2 ? `v${olderV} → v${newerV}` : "Diff"}
+            </span>
+            {diffLoading && <span className="muted">Loading…</span>}
+            {diffSummary && <span className="version-diff-summary muted">{diffSummary}</span>}
+            <button className="link-btn" onClick={closeDiff} title="Close diff">✕</button>
+          </div>
+          {diffData && (
+            <DiffEditor
+              original={diffData.older_dsl}
+              modified={diffData.newer_dsl}
+              language="plaintext"
+              height="280px"
+              theme="vs-dark"
+              options={{
+                readOnly: true,
+                renderSideBySide: true,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                fontSize: 12,
+              }}
+            />
+          )}
+        </div>
       )}
     </div>
   );

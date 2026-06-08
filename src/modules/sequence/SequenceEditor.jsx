@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
-  seqParse, seqRevComp, seqTranslate, seqGC, seqOrfs, seqRestriction,
+  seqParse, seqRevComp, seqTranslate, seqGC, seqOrfs, seqRestriction, designPrimers,
 } from "../../shared/lib/api/client.js";
 
 const BASE_COLOR = { A: "#3a86ff", C: "#ffbe0b", G: "#2a9d8f", T: "#e63946", U: "#e63946", N: "#9aa5b1" };
@@ -27,6 +27,7 @@ export default function SequenceEditor({ tab }) {
   const [orfs, setOrfs] = useState([]);
   const [translation, setTranslation] = useState(null);
   const [frame, setFrame] = useState(0);
+  const [primers, setPrimers] = useState(null);
 
   // Parse on mount (from tab.meta.sequence if present, else tab.content).
   useEffect(() => {
@@ -69,6 +70,10 @@ export default function SequenceEditor({ tab }) {
     setData((d) => ({ ...d, sequence: r.sequence, features: [] }));
   };
   const doTranslate = async () => setTranslation(await seqTranslate(seq, frame));
+  const doPrimers = async () => {
+    try { setPrimers((await designPrimers(seq, { target_tm: 60 })).primers); }
+    catch (e) { setError(e.message); }
+  };
 
   if (error) return <div className="seq-editor"><div className="dsl-error">{error}</div></div>;
   if (!data) return <div className="panel-empty">Parsing sequence…</div>;
@@ -89,7 +94,25 @@ export default function SequenceEditor({ tab }) {
         </select>
         <button className="btn" onClick={doTranslate}>Translate</button>
         <button className="btn" onClick={doRevComp}>Rev-comp</button>
+        <button className="btn" onClick={doPrimers}>Design Primers</button>
       </div>
+
+      {primers && (
+        <div className="primer-results">
+          <table className="protocol-table">
+            <thead><tr><th>Primer</th><th>Sequence (5'→3')</th><th>Len</th><th>Tm</th><th>GC%</th><th>Notes</th></tr></thead>
+            <tbody>
+              {primers.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.name}</td><td className="mono">{p.sequence}</td><td>{p.length}</td>
+                  <td>{p.tm}°C</td><td>{p.gc}</td>
+                  <td>{p.warnings?.length ? p.warnings.join("; ") : "✓"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showGC && gc && (
         <div className="seq-gc">

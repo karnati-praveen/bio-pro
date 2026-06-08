@@ -80,11 +80,12 @@ export default function CommandPalette() {
               {cmds.map((cmd) => (
                 <Command.Item
                   key={cmd.id}
-                  value={`${cmd.category} ${cmd.title}`}
+                  value={`${cmd.category} ${cmd.title} ${cmd.description ?? ""}`}
                   onSelect={() => handleRun(cmd)}
                   className="palette-item"
                 >
-                  <span>{cmd.title}</span>
+                  <span className="palette-item-title">{cmd.title}</span>
+                  {cmd.description && <span className="palette-item-desc">{cmd.description}</span>}
                   {cmd.keybinding && <kbd className="palette-kbd">{cmd.keybinding}</kbd>}
                 </Command.Item>
               ))}

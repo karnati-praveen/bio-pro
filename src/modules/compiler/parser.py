@@ -306,14 +306,17 @@ def parse_form(form: FormInput, organism: str | None = None) -> IntentSpec:
 
     part = library.get_part(form.output)
     if part is None or part.get("role") != "reporter":
-        raise ParseError(f"Unknown reporter '{form.output}'.")
+        valid = ", ".join(_REPORTER_ALIASES.keys())
+        raise ParseError(f"Unknown reporter '{form.output}'. Valid reporters: {valid}")
     trace.append(f"output reporter '{form.output}'")
 
     def _check_inducer(inducer_id: str) -> None:
         if library.get_part(inducer_id) is None:
-            raise ParseError(f"Unknown inducer '{inducer_id}'.")
+            valid = ", ".join(supported_inducers())
+            raise ParseError(f"Unknown inducer '{inducer_id}'. Valid inducers: {valid}")
         if system_for_inducer(inducer_id) is None:
-            raise ParseError(f"No inducible system defined for inducer '{inducer_id}'.")
+            valid = ", ".join(supported_inducers())
+            raise ParseError(f"No inducible system defined for inducer '{inducer_id}'. Valid inducers: {valid}")
 
     _check_inducer(form.inducer)
 

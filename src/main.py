@@ -14,6 +14,7 @@ Features:
 """
 
 import io
+import json
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -47,6 +48,11 @@ from modules.simulation import api as simulation_router
 from modules.llm import api as llm_router
 from modules.sequence import lsp as lsp_router
 from modules.chemistry import api as chemistry_router
+from modules.primers import api as primers_router
+from modules.protocol import api as protocol_router
+from modules.pathway import api as pathway_router
+from modules.experiments import api as experiments_router
+from modules.git import api as git_router
 
 
 @asynccontextmanager
@@ -75,6 +81,11 @@ app.include_router(simulation_router.router)
 app.include_router(llm_router.router)
 app.include_router(lsp_router.router)
 app.include_router(chemistry_router.router)
+app.include_router(primers_router.router)
+app.include_router(protocol_router.router)
+app.include_router(pathway_router.router)
+app.include_router(experiments_router.router)
+app.include_router(git_router.router)
 
 
 # --------------------------------------------------------------------------- #
@@ -390,6 +401,36 @@ def get_version(design_id: int, version_no: int) -> dict:
     return version
 
 
+@app.get("/api/designs/{design_id}/versions/{a}/diff/{b}")
+def diff_versions(design_id: int, a: int, b: int) -> dict:
+    """Compare two versions of a design. Returns DSL text for both and a node diff."""
+    va = repo.get_version(design_id, a)
+    vb = repo.get_version(design_id, b)
+    if va is None or vb is None:
+        raise HTTPException(status_code=404, detail="Version not found.")
+
+    older, newer = (va, vb) if a <= b else (vb, va)
+
+    older_dsl = (older["request"] or {}).get("text") or ""
+    newer_dsl = (newer["request"] or {}).get("text") or ""
+
+    older_nodes = (older["response"] or {}).get("circuit", {}).get("nodes", [])
+    newer_nodes = (newer["response"] or {}).get("circuit", {}).get("nodes", [])
+
+    older_map = {n["id"]: n for n in older_nodes if isinstance(n, dict) and "id" in n}
+    newer_map = {n["id"]: n for n in newer_nodes if isinstance(n, dict) and "id" in n}
+
+    added   = [n for nid, n in newer_map.items() if nid not in older_map]
+    removed = [n for nid, n in older_map.items() if nid not in newer_map]
+    changed = [n for nid, n in newer_map.items() if nid in older_map and n != older_map[nid]]
+
+    return {
+        "older_dsl": older_dsl,
+        "newer_dsl": newer_dsl,
+        "node_diff": {"added": added, "removed": removed, "changed": changed},
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Export (Feature 2)
 # --------------------------------------------------------------------------- #
@@ -413,7 +454,15 @@ def export_version(design_id: int, version_no: int, format: str = "genbank") -> 
     version = repo.get_version(design_id, version_no)
     if version is None:
         raise HTTPException(status_code=404, detail="Version not found.")
-    resp = CompileResponse.model_validate(version["response"])
+    try:
+        json.loads(version["request_json"])
+        response_data = json.loads(version["response_json"])
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Stored version data is not valid JSON: {exc}",
+        ) from exc
+    resp = CompileResponse.model_validate(response_data)
     return _export_response(resp, format, f"design{design_id}_v{version_no}")
 
 

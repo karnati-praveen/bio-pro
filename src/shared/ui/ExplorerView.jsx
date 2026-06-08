@@ -2,16 +2,19 @@ import { VscNewFile, VscFolderOpened, VscRefresh } from "react-icons/vsc";
 import { useProjectStore } from "../stores/projectStore.js";
 import { useTabStore } from "../stores/tabStore.js";
 import { useCircuitStore } from "../stores/circuitStore.js";
+import { useUiStore } from "../stores/uiStore.js";
 import { iconForFile, editorTypeForFile } from "../lib/fileTypes.js";
+import { isTauri } from "../lib/tauriFs.js";
 
 // Primary-sidebar Explorer: opens a project folder and lists its design files,
 // opening each in the correct editor. Ported from the original FileTree.jsx,
 // now backed by projectStore + tabStore.
 export default function ExplorerView() {
-  const { label, entries, error, openProject, refresh, readFile, newFileEntry } =
+  const { label, entries, error, dirHandle, openProject, refresh, readFile, newFileEntry } =
     useProjectStore();
   const openTab = useTabStore((s) => s.openTab);
   const ensureCircuit = useCircuitStore((s) => s.ensure);
+  const setStatus = useUiStore((s) => s.setStatus);
 
   const openEntry = async (entry) => {
     try {
@@ -30,6 +33,13 @@ export default function ExplorerView() {
   const onNew = () => {
     const raw = window.prompt("New file name (e.g. my_circuit.biopro):");
     if (!raw) return;
+    // Browser without an open folder: create an in-memory tab. Ctrl+S offers download/save-as.
+    if (!isTauri && !dirHandle) {
+      const name = raw.includes(".") ? raw : `${raw}.biopro`;
+      openTab({ type: editorTypeForFile(name), title: name, filePath: null, content: "" });
+      setStatus("File created in memory — press Ctrl+S to save/download.");
+      return;
+    }
     const entry = newFileEntry(raw);
     openEntry(entry);
   };

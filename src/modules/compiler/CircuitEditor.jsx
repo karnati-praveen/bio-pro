@@ -139,9 +139,10 @@ export default function CircuitEditor({ tabId, tab }) {
   const organism = session?.organism ?? "";
   const result = session?.result ?? null;
 
-  // Auto-switch to the circuit view once a compile produces a result.
+  // Auto-switch to the circuit view once a compile produces a result,
+  // but leave it alone if the user is already watching circuit or simulation.
   useEffect(() => {
-    if (result) setOutputTab((t) => (t === "circuit" || t === "simulation" ? t : t));
+    if (result) setOutputTab((t) => (t === "circuit" || t === "simulation" ? t : "circuit"));
   }, [result]);
 
   const setMarkers = useCallback((findings) => {
@@ -234,7 +235,18 @@ export default function CircuitEditor({ tabId, tab }) {
                 }}
               />
             </div>
-            {session?.error && <div className="dsl-error">{session.error}</div>}
+            {session?.error && (
+              <div style={{
+                borderLeft: "3px solid #f55",
+                background: "rgba(255,60,60,0.08)",
+                color: "#f99",
+                fontFamily: '"Fira Mono","Consolas",monospace',
+                fontSize: "12px",
+                padding: "8px 12px",
+                margin: "6px 8px",
+                whiteSpace: "pre-wrap",
+              }}>{session.error}</div>
+            )}
           </div>
         </Allotment.Pane>
 

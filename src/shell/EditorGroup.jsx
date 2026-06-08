@@ -1,15 +1,15 @@
 import TabStrip from "./TabStrip.jsx";
 import { useTabStore } from "../shared/stores/tabStore.js";
 import { resolveEditor } from "./editorRegistry.js";
+import ErrorBoundary from "../shared/ui/ErrorBoundary.jsx";
 
-// One editor pane: its tab strip plus the active tab's resolved editor component.
 export default function EditorGroup({ group }) {
-  const tabsById = useTabStore((s) => s.tabsById);
+  const tabsById       = useTabStore((s) => s.tabsById);
   const setActiveGroup = useTabStore((s) => s.setActiveGroup);
-  const activeGroupId = useTabStore((s) => s.activeGroupId);
+  const activeGroupId  = useTabStore((s) => s.activeGroupId);
 
   const activeTab = group.activeTabId ? tabsById[group.activeTabId] : null;
-  const Editor = activeTab ? resolveEditor(activeTab.type) : null;
+  const Editor    = activeTab ? resolveEditor(activeTab.type) : null;
 
   return (
     <div
@@ -19,11 +19,20 @@ export default function EditorGroup({ group }) {
       <TabStrip group={group} />
       <div className="editor-host">
         {activeTab ? (
-          <Editor key={activeTab.id} tab={activeTab} tabId={activeTab.id} />
+          <ErrorBoundary key={activeTab.id}>
+            <Editor tab={activeTab} tabId={activeTab.id} />
+          </ErrorBoundary>
         ) : (
           <div className="editor-empty">
-            <p>No file open.</p>
-            <p className="hint">Open a folder from the Explorer, or press <kbd>Ctrl+N</kbd> for a new circuit.</p>
+            <div style={{ fontSize: 40, opacity: 0.35 }}>🧪</div>
+            <p style={{ margin: 0, fontSize: "var(--text-md)", fontWeight: 600, color: "var(--text-muted)" }}>
+              No file open
+            </p>
+            <p className="hint">
+              Press <kbd>Ctrl+N</kbd> for a new circuit,{" "}
+              <kbd>Ctrl+O</kbd> to open a folder, or{" "}
+              <kbd>Ctrl+Shift+P</kbd> for all commands.
+            </p>
           </div>
         )}
       </div>

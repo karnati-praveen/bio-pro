@@ -215,6 +215,10 @@ class AssemblyProtocol(BaseModel):
     fragments: list[AssemblyFragment]
     steps: list[str]
     notes: list[str] = []
+    materials: list[dict] = []          # [{item, catalog, qty, unit_cost}]
+    primers: list[dict] = []            # designed primers (Gibson / Golden Gate)
+    est_time_min: Optional[int] = None
+    est_cost_usd: Optional[float] = None
 
 
 # --------------------------------------------------------------------------- #

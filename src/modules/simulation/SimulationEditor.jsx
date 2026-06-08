@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import { simulateOde, sensitivity as apiSensitivity, stochasticSimulate } from "../../shared/lib/api/client.js";
 import { useSimulationStore } from "../../shared/stores/simulationStore.js";
-import SimulationPlot from "./SimulationPlot.jsx";
+import SimulationPlot, { StochasticChart } from "./SimulationPlot.jsx";
 import ParameterSweep from "./ParameterSweep.jsx";
 
 const MODES = [
@@ -46,6 +46,7 @@ export default function SimulationEditor({ tab }) {
   const [mode, setMode] = useState("ode");
   const [params, setParams] = useState({ beta_p: "", gamma_p: "", k: "", n: "", i_max: "" });
   const [duration, setDuration] = useState(200);
+  const [stochThreshold, setStochThreshold] = useState("");
   const [sim, setSim] = useState(result?.simulation || null);
   const [stoch, setStoch] = useState(null);
   const [stochLoading, setStochLoading] = useState(false);
@@ -146,6 +147,22 @@ export default function SimulationEditor({ tab }) {
         <div className="sim-meta">host: {organism}</div>
         {mode === "ode" && <button className="btn primary" disabled={busy} onClick={runOde}>{busy ? "Running…" : "Run ODE ▶"}</button>}
         {mode === "sensitivity" && <button className="btn primary" disabled={busy} onClick={runSensitivity}>{busy ? "Running…" : "Run analysis ▶"}</button>}
+        {mode === "stochastic" && (
+          <>
+            <label className="sim-param-row">
+              <span>Threshold (optional)</span>
+              <input type="number" min="0" step="1" placeholder="none"
+                value={stochThreshold} onChange={(e) => setStochThreshold(e.target.value)} />
+            </label>
+            <button className="btn primary" disabled={stochLoading}
+              onClick={() => {
+                const t = stochThreshold !== "" && !isNaN(Number(stochThreshold)) ? Number(stochThreshold) : null;
+                runStoch(t);
+              }}>
+              {stochLoading ? "Running…" : "Run (N=50) ▶"}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Centre: chart */}
@@ -156,8 +173,13 @@ export default function SimulationEditor({ tab }) {
 
         {mode === "stochastic" && (
           <div className="plot-wrap">
-            <SimulationPlot simulation={result.simulation} stochastic={stoch}
-              onRunStochastic={runStoch} stochLoading={stochLoading} />
+            {stochLoading
+              ? <div className="panel-empty">Running stochastic simulation…</div>
+              : stoch
+              ? <StochasticChart stochastic={stoch}
+                  threshold={stochThreshold !== "" && !isNaN(Number(stochThreshold)) ? Number(stochThreshold) : null} />
+              : <div className="panel-empty">Click "Run (N=50) ▶" in the left panel to run the stochastic simulation.</div>
+            }
           </div>
         )}
 

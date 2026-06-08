@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -6,6 +6,7 @@ import ReactFlow, {
   MarkerType,
   Position,
   ReactFlowProvider,
+  applyNodeChanges,
   useReactFlow,
 } from "reactflow";
 import { toPng } from "html-to-image";
@@ -76,24 +77,47 @@ function FlowCanvas({ circuit }) {
 
   useEffect(() => { fetchParts(); }, [fetchParts]);
 
-  const { rfNodes, rfEdges } = useMemo(() => {
-    const rfNodes = layout(circuit.nodes);
-    const rfEdges = circuit.edges.map((e, i) => {
-      const style = EDGE_STYLE[e.kind] || EDGE_STYLE.expression;
-      const repressing = e.kind === "repression" || e.kind === "inhibition";
-      return {
-        id: `e${i}`,
-        source: e.source,
-        target: e.target,
-        label: style.label,
-        animated: e.kind === "expression",
-        style: { stroke: style.stroke, strokeWidth: 2, strokeDasharray: style.dashed ? "6 4" : undefined },
-        labelStyle: { fontSize: 11, fill: style.stroke },
-        markerEnd: repressing ? undefined : { type: MarkerType.ArrowClosed, color: style.stroke },
-      };
-    });
-    return { rfNodes, rfEdges };
+  const posRef = useRef({});
+  const [nodes, setNodes] = useState([]);
+
+  useEffect(() => {
+    const laid = layout(circuit.nodes);
+    setNodes(laid.map((n) =>
+      posRef.current[n.id] ? { ...n, position: posRef.current[n.id] } : n
+    ));
   }, [circuit]);
+
+  const onNodesChange = useCallback((changes) => {
+    setNodes((nds) => {
+      const updated = applyNodeChanges(changes, nds);
+      for (const change of changes) {
+        if (change.type === "position" && change.position) {
+          posRef.current[change.id] = change.position;
+        }
+      }
+      return updated;
+    });
+  }, []);
+
+  const resetLayout = useCallback(() => {
+    posRef.current = {};
+    setNodes(layout(circuit.nodes));
+  }, [circuit]);
+
+  const rfEdges = useMemo(() => circuit.edges.map((e, i) => {
+    const style = EDGE_STYLE[e.kind] || EDGE_STYLE.expression;
+    const repressing = e.kind === "repression" || e.kind === "inhibition";
+    return {
+      id: `e${i}`,
+      source: e.source,
+      target: e.target,
+      label: style.label,
+      animated: e.kind === "expression",
+      style: { stroke: style.stroke, strokeWidth: 2, strokeDasharray: style.dashed ? "6 4" : undefined },
+      labelStyle: { fontSize: 11, fill: style.stroke },
+      markerEnd: repressing ? undefined : { type: MarkerType.ArrowClosed, color: style.stroke },
+    };
+  }), [circuit]);
 
   const onNodeContextMenu = useCallback((e, node) => {
     e.preventDefault();
@@ -140,13 +164,15 @@ function FlowCanvas({ circuit }) {
         <button className="icon-btn" title="Zoom in" onClick={() => rf.zoomIn()}>＋</button>
         <button className="icon-btn" title="Zoom out" onClick={() => rf.zoomOut()}>－</button>
         <button className="icon-btn" title="Auto-layout (fit)" onClick={() => rf.fitView({ duration: 300 })}>▦</button>
+        <button className="icon-btn" title="Reset layout" onClick={resetLayout}>↺</button>
         <button className={`icon-btn${snap ? " active" : ""}`} title="Toggle grid snap" onClick={() => setSnap((s) => !s)}>⊞</button>
         <button className="icon-btn" title="Export PNG" onClick={exportPng}>⤓PNG</button>
       </div>
       <div className="circuit-canvas" onClick={closeMenu}>
         <ReactFlow
-          nodes={rfNodes}
+          nodes={nodes}
           edges={rfEdges}
+          onNodesChange={onNodesChange}
           nodeTypes={nodeTypes}
           fitView
           proOptions={{ hideAttribution: true }}

@@ -149,14 +149,17 @@ export const useTabStore = create((set, get) => ({
         target.tabIds = [...target.tabIds, tabId];
         target.activeTabId = tabId;
       }
-      target?.tabIds.forEach((t) => t); // noop keep
       groups.forEach((g) => {
         if (g.activeTabId === tabId && g.id !== groupId) {
           g.activeTabId = g.tabIds.slice(-1)[0] ?? null;
         }
       });
       const pruned = groups.filter((g, i) => i === 0 || g.tabIds.length > 0);
-      return { groups: pruned, activeGroupId: groupId };
+      const keptIds = new Set(pruned.flatMap((g) => g.tabIds));
+      const tabsById = Object.fromEntries(
+        Object.entries(state.tabsById).filter(([id]) => keptIds.has(id))
+      );
+      return { groups: pruned, tabsById, activeGroupId: groupId };
     });
   },
 }));
