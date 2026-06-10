@@ -225,6 +225,17 @@ def get_simulation_run(run_id: int) -> Optional[dict]:
 
 
 def _design_summary(design: Design) -> dict:
+    reporter_count = 0
+    inducer_count = 0
+    if design.versions:
+        latest = max(design.versions, key=lambda v: v.version_no)
+        try:
+            response = json.loads(latest.response_json)
+            nodes = response.get("circuit", {}).get("nodes", [])
+            reporter_count = sum(1 for n in nodes if isinstance(n, dict) and n.get("reporter"))
+            inducer_count = sum(1 for n in nodes if isinstance(n, dict) and n.get("type") == "inducer")
+        except Exception:
+            pass
     return {
         "id": design.id,
         "name": design.name,
@@ -232,4 +243,6 @@ def _design_summary(design: Design) -> dict:
         "created_at": design.created_at.isoformat(),
         "updated_at": design.updated_at.isoformat(),
         "latest_version": max((v.version_no for v in design.versions), default=0),
+        "reporter_count": reporter_count,
+        "inducer_count": inducer_count,
     }

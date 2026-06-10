@@ -8,7 +8,7 @@ import pytest
 
 from modules.compiler import assembler, parser, validate
 from modules.compiler.parser import ParseError
-from shared.schemas.schemas import FormInput, SimParams
+from shared.schemas.schemas import FormInput, IntentSpec, SimParams, Trigger
 from modules.simulation import ode
 
 
@@ -152,8 +152,8 @@ def test_simulate_single_input_rises_after_induction():
     spec = parser.parse_text("Express GFP when IPTG is present")
     sim = ode.simulate(spec)
     rep = _reporter_series(sim)
-    assert rep.values[0] < 1.0           # basal/off at the start
-    assert rep.values[-1] > rep.values[0]  # induced/on by the end
+    # Starts at the promoter's basal steady state (not zero); induced peak ≫ basal.
+    assert rep.values[-1] > 3 * rep.values[0]  # induced ≫ basal
 
 
 def test_simulate_absent_inducer_stays_near_basal():
@@ -206,6 +206,183 @@ def test_tunable_params_scale_output():
     assert boosted.values[-1] > base.values[-1]
 
 
+# Monotonic-direction tests: four single-input cases must each show a
+# clear transition across t_on in the biologically correct direction.
+CLEAR_MARGIN = 10.0  # AU — chosen relative to beta_p/gamma_p ≈ 125 max SS
+
+
+def test_inducible_present_reporter_rises():
+    """Basal low → induced high after t_on (standard inducible expression)."""
+    spec = parser.parse_text("Express GFP when IPTG is present")
+    rep = _reporter_series(ode.simulate(spec))
+    assert rep.values[-1] > rep.values[0] + CLEAR_MARGIN
+
+
+def test_inducible_absent_reporter_falls():
+    """Inducer present phase-1, removed at t_on: reporter starts high, ends low."""
+    spec = parser.parse_text("Express GFP without IPTG")
+    assert spec.trigger.presence == "absent"
+    rep = _reporter_series(ode.simulate(spec))
+    assert rep.values[0] > rep.values[-1] + CLEAR_MARGIN
+
+
+def test_repressible_reporter_falls():
+    """repressible_expression: inducer ON then OFF at t_on → reporter drops."""
+    spec = IntentSpec(
+        output="GFP",
+        triggers=[Trigger(inducer="IPTG", presence="absent")],
+        pattern="repressible_expression",
+    )
+    rep = _reporter_series(ode.simulate(spec))
+    assert rep.values[0] > rep.values[-1] + CLEAR_MARGIN
+
+
+def test_not_gate_reporter_falls():
+    """not_gate: input goes from high to low at t_on → reporter drops clearly."""
+    spec = IntentSpec(
+        output="GFP",
+        triggers=[Trigger(inducer="arabinose", presence="absent")],
+        pattern="not_gate",
+    )
+    rep = _reporter_series(ode.simulate(spec))
+    assert rep.values[0] > rep.values[-1] + CLEAR_MARGIN
+
+
+# --------------------------------------------------------------------------- #
+# Duration override and regulator dynamics
+# --------------------------------------------------------------------------- #
+def test_custom_duration_reporter_transition_scales_with_t_on():
+    """With duration=400, t_on = 400/3 ≈ 133; reporter is still near basal at the
+    default t_on (~67) because _input_plan now uses cfg["t_end"]."""
+    spec = parser.parse_text("Express GFP when IPTG is present")
+
+    default_sim = ode.simulate(spec)          # t_end=200, t_on≈67
+    long_sim = ode.simulate(spec, SimParams(duration=400.0))  # t_end=400, t_on≈133
+
+    def idx_near(sim, target):
+        return min(range(len(sim.t)), key=lambda i: abs(sim.t[i] - target))
+
+    # At t≈100: past the default t_on (67) but before the scaled t_on (133).
+    i_default = idx_near(default_sim, 100.0)
+    i_long = idx_near(long_sim, 100.0)
+
+    rep_default = _reporter_series(default_sim).values[i_default]
+    rep_long = _reporter_series(long_sim).values[i_long]
+
+    # default sim has already crossed t_on at t=100 → reporter rising/high.
+    # long sim has not yet crossed t_on at t=100 → reporter still near basal.
+    assert rep_default > rep_long * 3
+
+
+def test_standard_regulator_series_varies_across_t_on():
+    """The free/active regulator series in a standard inducible circuit must not be flat."""
+    spec = parser.parse_text("Express GFP when IPTG is present")
+    sim = ode.simulate(spec)
+    reg = next(
+        s for s in sim.series
+        if not s.is_reporter and "(input)" not in s.name
+    )
+    assert max(reg.values) - min(reg.values) > 0.1
+
+
+# --------------------------------------------------------------------------- #
+# Per-part kinetics: promoter-specific basal expression
+# --------------------------------------------------------------------------- #
+def test_pbad_higher_basal_than_ptet_uninduced():
+    """pBAD (arabinose, basal_frac≈0.10) leaks more than pTet (aTc, basal_frac≈0.02).
+
+    We compare the reporter level at the pre-induction plateau (well before t_on).
+    Both circuits start at their promoter's basal steady state, so the difference
+    is visible from the first timepoints.  The plateau at T/4 is reached within
+    ~4 degradation time constants (τ ≈ 12.5 min, T/4 ≈ 50 min).
+    """
+    pbad_spec = parser.parse_text("Express GFP when arabinose is present")
+    ptet_spec = parser.parse_text("Express GFP when aTc is present")
+    pbad_sim = ode.simulate(pbad_spec)
+    ptet_sim = ode.simulate(ptet_spec)
+
+    # Pre-induction window: up to the first quarter of the simulation (before t_on = T/3).
+    pre_idx = len(pbad_sim.t) // 4
+
+    pbad_pre = max(_reporter_series(pbad_sim).values[:pre_idx])
+    ptet_pre = max(_reporter_series(ptet_sim).values[:pre_idx])
+
+    # pBAD basal_frac (0.10) must produce a noticeably higher basal floor than
+    # pTet (0.02) when both are uninduced.
+    assert pbad_pre > ptet_pre, (
+        f"Expected pBAD pre-induction ({pbad_pre:.2f}) > pTet pre-induction ({ptet_pre:.2f})"
+    )
+
+
+def test_rbs_efficiency_scales_output():
+    """Lower rbs_efficiency shrinks the reporter output proportionally."""
+    spec = parser.parse_text("Express GFP when IPTG is present")
+    full_rbs = _reporter_series(ode.simulate(spec))                       # B0034 eff=1.0
+    weak_rbs = _reporter_series(ode.simulate(spec, SimParams(rbs_efficiency=0.3)))  # B0032
+    assert full_rbs.values[-1] > weak_rbs.values[-1]
+    # Scale should be roughly proportional (within 2×, not 10×)
+    assert full_rbs.values[-1] < 10 * weak_rbs.values[-1]
+
+
+def test_leaky_promoter_warning_matches_elevated_basal():
+    """The validator's leaky_expression threshold (basal/max > 10%) is consistent
+    with the ODE basal floor: promoters nearer the threshold produce higher
+    pre-induction reporter levels than tight promoters.
+
+    pBAD: basal_frac ≈ 0.10 (at the boundary of the warning threshold).
+    pTet: basal_frac ≈ 0.02 (well below threshold).
+    Both produce distinct basal floors in the simulation.
+    """
+    from modules.parts import library
+
+    pbad_frac, _ = library.promoter_kinetics("pBAD")
+    ptet_frac, _ = library.promoter_kinetics("pTet")
+    # Confirm structural assumption: pBAD is near/at the leaky threshold, pTet is not.
+    assert pbad_frac >= 0.09, f"pBAD basal_frac={pbad_frac:.3f} should be ≈0.10"
+    assert ptet_frac < 0.05, f"pTet basal_frac={ptet_frac:.3f} should be ≈0.02"
+
+    pbad_spec = parser.parse_text("Express GFP when arabinose is present")
+    ptet_spec = parser.parse_text("Express GFP when aTc is present")
+    pre_idx = len(ode.simulate(pbad_spec).t) // 4
+    pbad_pre = max(_reporter_series(ode.simulate(pbad_spec)).values[:pre_idx])
+    ptet_pre = max(_reporter_series(ode.simulate(ptet_spec)).values[:pre_idx])
+    # Promoter closer to the leaky threshold must show a higher basal floor.
+    assert pbad_pre > ptet_pre, (
+        f"pBAD pre-induction ({pbad_pre:.2f}) must exceed pTet ({ptet_pre:.2f})"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Dose-response
+# --------------------------------------------------------------------------- #
+def test_dose_response_band_pass_non_monotonic():
+    """Band-pass dose-response must peak at an intermediate inducer concentration."""
+    spec = IntentSpec(
+        output="GFP",
+        triggers=[Trigger(inducer="IPTG", presence="present")],
+        pattern="band_pass_filter",
+    )
+    dr = ode.dose_response(spec)
+    outputs = dr.output
+    peak_idx = outputs.index(max(outputs))
+    # Peak must not be at the first or last dose — it must be at an intermediate level.
+    assert 0 < peak_idx < len(outputs) - 1, (
+        f"Band-pass peak at index {peak_idx}/{len(outputs)-1} is not intermediate"
+    )
+
+
+def test_dose_response_inducible_monotonic_increasing():
+    """Inducible dose-response must be monotonically increasing across the sweep."""
+    spec = parser.parse_text("Express GFP when IPTG is present")
+    dr = ode.dose_response(spec)
+    outputs = dr.output
+    # Allow tiny floating-point noise (1e-6 tolerance)
+    assert all(outputs[i] <= outputs[i + 1] + 1e-6 for i in range(len(outputs) - 1)), (
+        "Inducible dose-response is not monotonically increasing"
+    )
+    assert outputs[-1] > outputs[0] * 2, "Inducible range too small to confirm sigmoid"
+
+
 # --------------------------------------------------------------------------- #
 # Validation (design-rule checks)
 # --------------------------------------------------------------------------- #
@@ -235,3 +412,87 @@ def test_validation_flags_missing_terminator():
     spec = parser.parse_text("Express GFP when IPTG is present")
     result = validate.validate(spec, bad)
     assert any(f.code == "missing_terminator" for f in result.findings)
+
+
+# --------------------------------------------------------------------------- #
+# Stochastic simulation: Omega scaling and SSA mean vs ODE
+# --------------------------------------------------------------------------- #
+_SSA_SEED = 42
+_SSA_N_TRAJ = 20    # small enough that each test runs in under ~10 s on a single core
+
+
+def _ssa_compile_response(spec):
+    """Minimal CompileResponse for stochastic tests — no LLM needed."""
+    from shared.schemas.schemas import CompileResponse
+    from modules.compiler import assembler, validate as _validate
+    circuit = assembler.assemble(spec)
+    val = _validate.validate(spec, circuit)
+    sim = ode.simulate(spec)
+    return CompileResponse(spec=spec, circuit=circuit, validation=val, simulation=sim, trace=[])
+
+
+def test_ssa_mean_tracks_ode_constitutive():
+    """SSA mean at steady state matches ODE SS within 20% (constitutive expression).
+
+    Omega=5 gives ~625 molecules at SS; Poisson SE of mean ≈ 0.9% across 20 trajectories.
+    """
+    from shared.schemas.schemas import StochasticRequest
+    from modules.simulation.stochastic import run_stochastic
+
+    spec = IntentSpec(output="GFP", triggers=[], pattern="constitutive_expression")
+    cr = _ssa_compile_response(spec)
+
+    ode_ss = _reporter_series(ode.simulate(spec)).values[-1]
+
+    result = run_stochastic(StochasticRequest(
+        compile_result=cr,
+        n_trajectories=_SSA_N_TRAJ,
+        seed=_SSA_SEED,
+        omega=5.0,
+    ))
+    ssa_ss = result.series[0].mean[-1]
+
+    assert abs(ssa_ss - ode_ss) / ode_ss < 0.20, (
+        f"Constitutive SSA mean ({ssa_ss:.3f}) not within 20% of ODE SS ({ode_ss:.3f})"
+    )
+
+
+def test_ssa_inducible_mean_rises_after_induction():
+    """SSA mean reporter increases after induction in an inducible circuit."""
+    from shared.schemas.schemas import StochasticRequest
+    from modules.simulation.stochastic import run_stochastic
+
+    spec = parser.parse_text("Express GFP when IPTG is present")
+    cr = _ssa_compile_response(spec)
+
+    result = run_stochastic(StochasticRequest(
+        compile_result=cr,
+        n_trajectories=15,   # fewer traj is fine; test checks direction not exact value
+        seed=_SSA_SEED,
+        omega=3.0,
+    ))
+    mean_vals = result.series[0].mean
+    # Post-induction mean must be substantially higher than pre-induction baseline
+    assert mean_vals[-1] > 3 * mean_vals[0], (
+        f"Inducible SSA mean end ({mean_vals[-1]:.3f}) not > 3× start ({mean_vals[0]:.3f})"
+    )
+
+
+def test_cv_decreases_with_larger_omega():
+    """Larger Omega yields smaller CV (more molecules → less relative noise)."""
+    from shared.schemas.schemas import StochasticRequest
+    from modules.simulation.stochastic import run_stochastic
+
+    spec = IntentSpec(output="GFP", triggers=[], pattern="constitutive_expression")
+    cr = _ssa_compile_response(spec)
+
+    # omega=1 → N_SS≈125 molecules, CV≈0.09; omega=5 → N_SS≈625, CV≈0.04.
+    # Both keep step counts < 20 000/trajectory so the test runs in under ~10 s.
+    common = dict(compile_result=cr, n_trajectories=_SSA_N_TRAJ, seed=_SSA_SEED)
+
+    cv_small = run_stochastic(StochasticRequest(**common, omega=1.0)).noise_index
+    cv_large = run_stochastic(StochasticRequest(**common, omega=5.0)).noise_index
+
+    assert cv_large < cv_small, (
+        f"CV with Omega=5 ({cv_large:.4f}) should be < CV with Omega=1 ({cv_small:.4f})"
+    )

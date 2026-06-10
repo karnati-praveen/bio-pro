@@ -12,6 +12,7 @@ export const useUiStore = create((set, get) => ({
   activeActivity: "explorer",
   bottomTab: "problems",
   paletteOpen: false,
+  modal: null,
   status: "Ready",
 
   // ── Toast notifications ────────────────────────────────────────────────────
@@ -69,6 +70,9 @@ export const useUiStore = create((set, get) => ({
   openPalette: () => set({ paletteOpen: true }),
   closePalette: () => set({ paletteOpen: false }),
   togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
+
+  openModal: (id) => set({ modal: id }),
+  closeModal: () => set({ modal: null }),
 
   setStatus: (status) => set({ status }),
 

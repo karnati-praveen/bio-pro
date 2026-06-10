@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from shared.schemas.schemas import CompileResponse, SimParams, Simulation
+from shared.schemas.schemas import CompileResponse, SimParams, Simulation, DoseResponseRequest, DoseResponse
 from modules.simulation import ode
 from shared.db import repo
 
@@ -26,6 +26,15 @@ def simulate(req: SimulateRequest) -> Simulation:
     """Re-run the deterministic ODE for a compiled circuit with parameter overrides."""
     try:
         return ode.simulate(req.compile_result.spec, req.params)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/simulate/dose-response")
+def dose_response(req: DoseResponseRequest) -> DoseResponse:
+    """Steady-state reporter vs. log-spaced inducer concentration sweep."""
+    try:
+        return ode.dose_response(req.compile_result.spec, req.n_doses, req.params)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

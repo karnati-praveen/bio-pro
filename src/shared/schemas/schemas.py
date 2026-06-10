@@ -54,6 +54,8 @@ class SimParams(BaseModel):
     n: Optional[float] = Field(None, gt=0, description="Hill coefficient (cooperativity)")
     i_max: Optional[float] = Field(None, gt=0, description="inducer level once switched on")
     duration: Optional[float] = Field(None, gt=0, description="simulation end time override (min)")
+    rbs_efficiency: Optional[float] = Field(None, gt=0, le=1.0,
+        description="RBS translation efficiency [0,1]; default 1.0 (B0034 strong RBS)")
 
 
 class FormInput(BaseModel):
@@ -149,6 +151,8 @@ class StochasticRequest(BaseModel):
     compile_result: "CompileResponse"
     n_trajectories: int = Field(50, ge=1, le=500)
     threshold: Optional[float] = Field(None, description="Threshold for probability calculation")
+    seed: Optional[int] = Field(None, description="RNG seed; None = non-reproducible (default), integer = fixed for CI/testing")
+    omega: Optional[float] = Field(None, gt=0, description="System-size Ω: molecules = concentration × Ω. Defaults to 20 × (cell_volume / ecoli_volume) for the target organism.")
 
 
 class StochasticSeries(BaseModel):
@@ -193,6 +197,20 @@ class SweepResponse(BaseModel):
     curves: list[SweepCurve]
     sensitivity_score: float   # % change peak output / % change param across full range
     top_sensitive: list[dict]  # top 3 params by sensitivity (from full analysis)
+
+
+class DoseResponseRequest(BaseModel):
+    """Sweep inducer concentration at steady state to compute dose-response curve."""
+    compile_result: "CompileResponse"
+    n_doses: int = Field(50, ge=5, le=200)
+    params: Optional[SimParams] = None
+
+
+class DoseResponse(BaseModel):
+    dose: list[float]    # log-spaced inducer concentrations
+    output: list[float]  # steady-state reporter at each dose
+    inducer: str
+    reporter: str
 
 
 # --------------------------------------------------------------------------- #
@@ -273,4 +291,5 @@ class CompileResponse(BaseModel):
 # Fix forward references
 StochasticRequest.model_rebuild()
 SweepRequest.model_rebuild()
+DoseResponseRequest.model_rebuild()
 AssemblyRequest.model_rebuild()

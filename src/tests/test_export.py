@@ -72,3 +72,96 @@ def test_unknown_format_raises():
     resp = _response("Express GFP when IPTG is present")
     with pytest.raises(ValueError):
         export.export(resp, "docx")
+
+
+# ---------------------------------------------------------------------------
+# Helper: collect all feature /label qualifier values across a list of records
+# ---------------------------------------------------------------------------
+def _feature_labels(records) -> set[str]:
+    return {
+        lbl
+        for rec in records
+        for feat in rec.features
+        for lbl in feat.qualifiers.get("label", [])
+    }
+
+
+# ---------------------------------------------------------------------------
+# Parametrized: every complex circuit produces valid, complete GenBank output
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("text,expected_pattern,expected_tus", [
+    ("Express GFP when IPTG and arabinose are present", "logic_and", 3),
+    ("NAND gate GFP with IPTG and arabinose",           "logic_nand", 3),
+    ("Repressilator with GFP reporter",                 "oscillator", 4),
+    ("Toggle switch with GFP output",                   "toggle_switch", 3),
+])
+def test_complex_circuit_genbank_complete(text, expected_pattern, expected_tus):
+    resp = _response(text)
+    assert resp.spec.pattern == expected_pattern
+
+    gb_text, _, suffix = export.export(resp, "genbank")
+    assert suffix == "gb"
+    assert gb_text  # non-empty
+
+    records = list(SeqIO.parse(io.StringIO(gb_text), "genbank"))
+    assert len(records) == expected_tus
+    assert all(len(r.seq) > 0 for r in records)
+
+    labels = _feature_labels(records)
+    for tu in resp.circuit.transcription_units:
+        for part_id in tu.parts:
+            assert part_id in labels, (
+                f"Part {part_id!r} from TU {tu.name!r} missing from GenBank features"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Parametrized: every complex circuit produces valid, complete FASTA output
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("text,expected_tus", [
+    ("Express GFP when IPTG and arabinose are present", 3),
+    ("NAND gate GFP with IPTG and arabinose",           3),
+    ("Repressilator with GFP reporter",                 4),
+    ("Toggle switch with GFP output",                   3),
+])
+def test_complex_circuit_fasta_complete(text, expected_tus):
+    resp = _response(text)
+    fa_text, _, suffix = export.export(resp, "fasta")
+    assert suffix == "fasta"
+    assert fa_text
+
+    records = list(SeqIO.parse(io.StringIO(fa_text), "fasta"))
+    assert len(records) == expected_tus
+    assert all(len(r.seq) > 0 for r in records)
+
+
+# ---------------------------------------------------------------------------
+# logic_and specifically: verify pAND gets a documented placeholder (not dropped)
+# ---------------------------------------------------------------------------
+def test_logic_and_placeholder_documented_in_genbank():
+    resp = _response("Express GFP when IPTG and arabinose are present")
+    gb_text, _, _ = export.export(resp, "genbank")
+
+    # The note text must name the placeholder so readers know Ns are intentional.
+    assert "SYNTHETIC_PLACEHOLDER" in gb_text
+
+    records = list(SeqIO.parse(io.StringIO(gb_text), "genbank"))
+    # Output TU (last record) uses pAND — its sequence must contain Ns.
+    output_rec = records[-1]
+    assert "N" in str(output_rec.seq).upper(), (
+        "Expected poly-N placeholder in logic_and output TU sequence"
+    )
+    # The record-level COMMENT should warn about the substitution.
+    assert output_rec.annotations.get("comment"), (
+        "Expected COMMENT annotation on record with placeholder parts"
+    )
+
+
+# ---------------------------------------------------------------------------
+# logic_and: SBOL still emits a well-formed Component for the synthetic pAND
+# ---------------------------------------------------------------------------
+def test_logic_and_sbol_synthetic_part_annotated():
+    resp = _response("Express GFP when IPTG and arabinose are present")
+    sbol_text, media, _ = export.export(resp, "sbol")
+    assert media == "application/rdf+xml"
+    assert "SYNTHETIC_PLACEHOLDER" in sbol_text

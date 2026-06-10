@@ -146,6 +146,9 @@ export const COMMANDS = [
   { id: "help.welcome", title: "Show Welcome Screen", category: "Help",
     description: "Open the welcome tab with examples and quick-start actions",
     run: () => tabs().openTab({ type: "welcome", title: "Welcome", icon: "🏠" }) },
+  { id: "help.shortcuts", title: "Keyboard Shortcuts Reference", category: "Help", keybinding: "Ctrl+Shift+?",
+    description: "Show all keyboard shortcuts grouped by category",
+    run: () => ui().openModal("keyboard-shortcuts") },
 
   // ── File ──────────────────────────────────────────────────────────────
   {
@@ -201,6 +204,12 @@ export const COMMANDS = [
   { id: "wf.newPrimers", title: "New Primer Design", category: "Workflow",
     description: "Design PCR primer pairs using SantaLucia nearest-neighbor thermodynamics",
     run: () => tabs().openTab({ type: "primers", title: "Primer Design", icon: "🧬" }) },
+  { id: "biology.crisprDesign", title: "CRISPR Guide RNA Design", category: "Biology",
+    description: "Design SpCas9 / SaCas9 / Cas12a guide RNAs for a target sequence",
+    run: () => tabs().openTab({ type: "crispr", title: "CRISPR Guide Design" }) },
+  { id: "biology.codonOptimize", title: "Codon Optimizer", category: "Biology",
+    description: "Back-translate or recode a CDS / protein for E. coli, yeast, or human expression; reports CAI before/after",
+    run: () => tabs().openTab({ type: "codon", title: "Codon Optimizer" }) },
   {
     id: "wf.generateProtocol", title: "Generate Protocol", category: "Workflow",
     run: () => {
@@ -278,6 +287,47 @@ export const COMMANDS = [
       ui().setStatus("Running stochastic simulation…");
       await circuits().runStochastic(t.id, null);
       ui().setStatus("Stochastic simulation complete.");
+    },
+  },
+
+  // ── Biology ───────────────────────────────────────────────────────────
+  {
+    id: "biology.plasmidMap",
+    title: "View Plasmid Map",
+    category: "Biology",
+    keybinding: "Ctrl+Shift+M",
+    description: "Open a circular/linear plasmid map for the active sequence file or compiled circuit",
+    run: () => {
+      const t = tabs().activeTab();
+      if (!t) { toast("Open a sequence or circuit tab first", "warning"); return; }
+
+      if (t.type === "circuit") {
+        const c = circuits().get(t.id);
+        if (!c?.result) {
+          ui().setStatus("Compile the circuit first (Ctrl+Enter).");
+          toast("Compile a circuit first", "warning");
+          return;
+        }
+        tabs().openTab({
+          type:  "plasmid",
+          title: `Map: ${c.result.spec?.output || t.title}`,
+          meta:  { source: "circuit", result: c.result },
+        });
+        return;
+      }
+
+      // Sequence tab or .gb/.fasta file
+      const ext = (t.filePath || t.title || "").split(".").pop().toLowerCase();
+      if (t.type === "sequence" || ["gb", "gbk", "fasta", "fa"].includes(ext)) {
+        tabs().openTab({
+          type:  "plasmid",
+          title: `Map: ${t.title}`,
+          meta:  { source: "sequence", content: t.content, filename: t.filePath || t.title },
+        });
+        return;
+      }
+
+      toast("Active tab is not a sequence file or compiled circuit", "warning");
     },
   },
 

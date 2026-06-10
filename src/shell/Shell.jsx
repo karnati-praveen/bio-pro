@@ -7,6 +7,7 @@ import EditorArea from "./EditorArea.jsx";
 import BottomPanel from "./BottomPanel.jsx";
 import StatusBar from "./StatusBar.jsx";
 import CommandPalette from "./CommandPalette.jsx";
+import KeyboardShortcutsPanel from "../shared/ui/KeyboardShortcutsPanel.jsx";
 import { useGlobalKeybindings } from "./keybindings.js";
 import { useUiStore } from "../shared/stores/uiStore.js";
 
@@ -55,6 +56,7 @@ export default function Shell() {
       </div>
       <StatusBar />
       <CommandPalette />
+      <KeyboardShortcutsPanel />
     </div>
   );
 }

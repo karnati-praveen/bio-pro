@@ -44,7 +44,17 @@ def to_sbol(response: CompileResponse) -> str:
             return part_components[part_id]
         part = library.get_part(part_id) or {}
         roles = [role_for[part["type"]]] if part.get("type") in role_for else []
-        comp = sbol3.Component(part_id, sbol3.SBO_DNA, roles=roles, name=part.get("name"))
+        comp = sbol3.Component(part_id, sbol3.SBO_DNA, roles=roles, name=part.get("name") or part_id)
+        if not part:
+            comp.description = (
+                f"SYNTHETIC_PLACEHOLDER: {part_id} is not in the parts catalogue; "
+                "no sequence available"
+            )
+        elif not part.get("seq"):
+            comp.description = (
+                f"SYNTHETIC_PLACEHOLDER: {part_id} has no catalogued sequence; "
+                "design-level component only"
+            )
         if part.get("seq"):
             seq = sbol3.Sequence(
                 f"{part_id}_seq",

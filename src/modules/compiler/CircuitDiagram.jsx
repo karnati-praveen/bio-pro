@@ -15,6 +15,7 @@ import { nodeTypes } from "./partNodes.jsx";
 import { usePartsStore } from "../../shared/stores/partsStore.js";
 import { useUiStore } from "../../shared/stores/uiStore.js";
 import { useTabStore } from "../../shared/stores/tabStore.js";
+import { useCircuitStore } from "../../shared/stores/circuitStore.js";
 
 // Edge styling encodes regulation kind.
 const EDGE_STYLE = {
@@ -137,6 +138,24 @@ function FlowCanvas({ circuit }) {
     });
   }, []);
 
+  const generateDsl = useCallback(async () => {
+    const base = import.meta.env.VITE_API_BASE_URL ?? "";
+    try {
+      const res = await fetch(`${base}/api/circuit/to-dsl`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nodes: circuit.nodes, edges: circuit.edges }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { dsl } = await res.json();
+      const tabId = useTabStore.getState().activeTab()?.id;
+      if (tabId) useCircuitStore.getState().setDsl(tabId, dsl);
+      useUiStore.getState().addToast("DSL updated from diagram");
+    } catch (err) {
+      useUiStore.getState().addToast(`Failed to generate DSL: ${err.message}`, "error");
+    }
+  }, [circuit]);
+
   // Context-menu actions
   const viewDetails = () => {
     selectPart(menu.nodeId);
@@ -167,6 +186,7 @@ function FlowCanvas({ circuit }) {
         <button className="icon-btn" title="Reset layout" onClick={resetLayout}>↺</button>
         <button className={`icon-btn${snap ? " active" : ""}`} title="Toggle grid snap" onClick={() => setSnap((s) => !s)}>⊞</button>
         <button className="icon-btn" title="Export PNG" onClick={exportPng}>⤓PNG</button>
+        <button className="icon-btn" title="Generate DSL from diagram" onClick={generateDsl}>⟳DSL</button>
       </div>
       <div className="circuit-canvas" onClick={closeMenu}>
         <ReactFlow

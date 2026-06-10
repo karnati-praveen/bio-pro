@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { useCircuitStore } from "../../shared/stores/circuitStore.js";
 import { useTabStore } from "../../shared/stores/tabStore.js";
+import { doseResponse as fetchDoseResponse } from "../../shared/lib/api/client.js";
 
 const FALLBACK_COLORS = ["#52b788", "#ffb703", "#cdb4db", "#e63946"];
 
@@ -234,9 +235,58 @@ function StochasticInlineChart({ stochastic }) {
   );
 }
 
-export default function SimulationPlot({ simulation, stochastic, onRunStochastic, stochLoading }) {
+// Dose-response chart: steady-state output vs inducer concentration (log x-axis).
+// Band-pass shows a peak; inducible shows a sigmoid; repressible an inverse sigmoid.
+function DoseResponseChart({ dr, loading }) {
+  if (loading) return <div className="panel-empty">Computing dose-response…</div>;
+  if (!dr) return <div className="panel-empty">Click "Run dose-response ▶" to compute.</div>;
+
+  const data = dr.dose.map((d, i) => ({ dose: d, output: dr.output[i] }));
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={data} margin={{ top: 8, right: 24, bottom: 36, left: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef2f4" />
+        <XAxis
+          dataKey="dose"
+          scale="log"
+          domain={["auto", "auto"]}
+          type="number"
+          tickFormatter={(v) => v < 0.01 ? v.toExponential(0) : Number(v.toPrecision(2)).toString()}
+          label={{ value: `[${dr.inducer}] (a.u., log scale)`, position: "insideBottom", offset: -18 }}
+          tick={{ fontSize: 11 }}
+        />
+        <YAxis
+          label={{
+            value: `${dr.reporter} steady-state (a.u.)`,
+            angle: -90,
+            position: "insideLeft",
+            style: { textAnchor: "middle" },
+          }}
+          tick={{ fontSize: 11 }}
+        />
+        <Tooltip
+          formatter={(v) => [v.toFixed(3), dr.reporter]}
+          labelFormatter={(v) => `[${dr.inducer}] = ${Number(v).toExponential(2)}`}
+        />
+        <Line
+          type="monotone"
+          dataKey="output"
+          stroke="#52b788"
+          strokeWidth={2.5}
+          dot={false}
+          name={dr.reporter}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+export default function SimulationPlot({ simulation, stochastic, onRunStochastic, stochLoading, compileResult }) {
   const [mode, setMode] = useState("deterministic");
   const [threshold, setThreshold] = useState("");
+  const [dr, setDr] = useState(null);
+  const [drLoading, setDrLoading] = useState(false);
 
   const activeTab = useTabStore((s) => s.activeTab());
   const storeStochastic = useCircuitStore((s) => {
@@ -249,6 +299,19 @@ export default function SimulationPlot({ simulation, stochastic, onRunStochastic
   }
 
   const thresholdNum = threshold !== "" && !isNaN(Number(threshold)) ? Number(threshold) : null;
+
+  const runDoseResponse = async () => {
+    if (!compileResult) return;
+    setDrLoading(true);
+    try {
+      const data = await fetchDoseResponse(compileResult);
+      setDr(data);
+    } catch (e) {
+      console.error("Dose-response failed:", e);
+    } finally {
+      setDrLoading(false);
+    }
+  };
 
   return (
     <div className="sim-plot-wrap">
@@ -265,6 +328,14 @@ export default function SimulationPlot({ simulation, stochastic, onRunStochastic
         >
           Stochastic (Gillespie)
         </button>
+        {compileResult && (
+          <button
+            className={mode === "dose-response" ? "tab active" : "tab"}
+            onClick={() => setMode("dose-response")}
+          >
+            Dose-Response
+          </button>
+        )}
 
         {mode === "stochastic" && (
           <>
@@ -290,11 +361,23 @@ export default function SimulationPlot({ simulation, stochastic, onRunStochastic
             </label>
           </>
         )}
+        {mode === "dose-response" && (
+          <button
+            className="compile-btn small"
+            onClick={runDoseResponse}
+            disabled={drLoading}
+            style={{ marginLeft: "auto" }}
+          >
+            {drLoading ? "Running…" : "Run dose-response ▶"}
+          </button>
+        )}
       </div>
 
       <div className="plot-wrap">
         {mode === "deterministic" ? (
           <DeterministicChart simulation={simulation} />
+        ) : mode === "dose-response" ? (
+          <DoseResponseChart dr={dr} loading={drLoading} />
         ) : (
           <StochasticChart stochastic={stochastic} threshold={thresholdNum} />
         )}

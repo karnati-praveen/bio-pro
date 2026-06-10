@@ -1,6 +1,29 @@
 """ODE simulation: Hill-kinetics models for all 15 circuit patterns + parameter sweep.
 
 Host-specific constants scale transcription/translation/dilution rates.
+
+Per-part kinetics mapping (from parts.json kinetic_parameters)
+--------------------------------------------------------------
+Each Hill drive f ∈ [0, 1] computed by _drive() is wrapped before use:
+
+    f_eff = basal_frac + (1 - basal_frac) * f
+
+where basal_frac = promoter.basal_expression / promoter.max_expression.
+
+The reporter production term is:
+
+    dP/dt = beta_p * max_expr * rbs_eff * f_eff  −  gamma_p * P
+
+  max_expr  — promoter.max_expression (a.u.); scales peak output relative to
+              the global BETA_P baseline (pBAD=3.0, pTet=2.5, pLac=2.0).
+  rbs_eff   — rbs.translation_efficiency; defaults to 1.0 (B0034 strong RBS).
+  basal_frac— leak floor; pBAD≈0.10, pLac≈0.05, pTet≈0.02. Promoters with
+              basal_frac > 0.10 trigger the validator's leaky_expression warning
+              and produce a visibly elevated pre-induction plateau in the curve.
+
+Initial conditions start at the basal steady state (eff_beta * basal_frac / gamma_p)
+so the basal floor is immediately visible and the induction rise is measured relative
+to a realistic starting point.
 """
 
 from typing import Optional
@@ -9,7 +32,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from modules.parts import library
-from shared.schemas.schemas import IntentSpec, Simulation, Series, SimParams, SweepRequest, SweepResponse, SweepCurve
+from shared.schemas.schemas import IntentSpec, Simulation, Series, SimParams, SweepRequest, SweepResponse, SweepCurve, DoseResponse
 from modules.compiler.rules import system_for_inducer, REPRESSILATOR, TOGGLE_SWITCH
 
 # --------------------------------------------------------------------------- #
@@ -85,13 +108,17 @@ def _resolve(params: Optional[SimParams], organism: Optional[str] = None) -> dic
         "beta_r": BETA_R * hc["beta_r_scale"],
         "gamma_r": GAMMA_R * hc["gamma_scale"],
         "t_end": t_end,
+        "rbs_efficiency": p.rbs_efficiency if p.rbs_efficiency is not None else 1.0,
     }
 
 
 def _step(t: float, t_on: float, present: bool, i_max: float) -> float:
-    if not present:
-        return 0.0
-    return i_max if t >= t_on else 0.0
+    # present=True : off → on at t_on  (inducible)
+    # present=False: on → off at t_on  (repressible / not-gate / absent)
+    if present:
+        return i_max if t >= t_on else 0.0
+    else:
+        return 0.0 if t >= t_on else i_max
 
 
 def _drive(mode: str, R: float, inducer: float, k: float, n: float) -> float:
@@ -121,14 +148,15 @@ def _combine(pattern: str, drives: list[float]) -> float:
     return drives[0]
 
 
-def _input_plan(spec: IntentSpec) -> list[dict]:
+def _input_plan(spec: IntentSpec, cfg: dict) -> list[dict]:
+    # t_on scales with cfg["t_end"] so a user duration override keeps t_on in sync.
     n = len(spec.triggers)
+    t_end = cfg["t_end"]
     plan = []
     for idx, trig in enumerate(spec.triggers):
         system = system_for_inducer(trig.inducer)
         if system is None:
             raise ValueError(f"No inducible system for '{trig.inducer}'.")
-        t_end = HOST_CONSTANTS.get(spec.organism or "ecoli", HOST_CONSTANTS["ecoli"])["t_end"]
         t_on = t_end / 3.0 if n == 1 else t_end * (idx + 1) / 4.0
         plan.append({
             "inducer": trig.inducer,
@@ -145,15 +173,19 @@ def _input_plan(spec: IntentSpec) -> list[dict]:
 # --------------------------------------------------------------------------- #
 def _simulate_standard(spec: IntentSpec, cfg: dict) -> tuple:
     """Standard inducible/gate patterns. Returns (sol, t_eval, plan, n_inputs)."""
-    plan = _input_plan(spec)
+    plan = _input_plan(spec, cfg)
     n_inputs = len(plan)
     t_end = cfg["t_end"]
 
     if n_inputs >= 1:
-        promoter = library.get_part(system_for_inducer(plan[0]["inducer"])["promoter"])
-        strength = float(promoter.get("strength", 1.0)) if promoter else 1.0
+        promoter_id = system_for_inducer(plan[0]["inducer"])["promoter"]
+        basal_frac, max_expr = library.promoter_kinetics(promoter_id)
     else:
-        strength = 1.0
+        basal_frac, max_expr = 0.0, 1.0
+
+    # Effective max production: global beta_p scaled by promoter max_expression
+    # and RBS translation efficiency (default 1.0 = B0034 strong RBS).
+    eff_beta = cfg["beta_p"] * max_expr * cfg["rbs_efficiency"]
 
     def rhs(t, y):
         regulators = y[:n_inputs]
@@ -164,13 +196,29 @@ def _simulate_standard(spec: IntentSpec, cfg: dict) -> tuple:
             for inp, R in zip(plan, regulators)
         ]
         f = _combine(spec.pattern, drives)
+        # Leak floor: even at f=0 the promoter expresses at basal_frac of its max rate.
+        f_eff = basal_frac + (1.0 - basal_frac) * f
         dR = [cfg["beta_r"] - cfg["gamma_r"] * max(R, 0.0) for R in regulators]
-        dP = cfg["beta_p"] * strength * f - cfg["gamma_p"] * P
+        dP = eff_beta * f_eff - cfg["gamma_p"] * P
         return [*dR, dP]
 
     t_eval = np.linspace(0.0, t_end, N_POINTS)
     r0 = cfg["beta_r"] / cfg["gamma_r"]
-    y0 = [r0] * n_inputs + [0.0]
+    # For absent inputs the inducer starts ON; pre-set reporter at the induced
+    # steady state so the simulation shows the drop, not a flat basal line.
+    if any(not inp["present"] for inp in plan):
+        initial_inducers = [cfg["i_max"] if not inp["present"] else 0.0 for inp in plan]
+        drives0 = [
+            _drive(inp["mode"], r0, ind0, cfg["k"], cfg["n"])
+            for inp, ind0 in zip(plan, initial_inducers)
+        ]
+        f0 = _combine(spec.pattern, drives0)
+        f_eff0 = basal_frac + (1.0 - basal_frac) * f0
+        P0 = eff_beta * f_eff0 / cfg["gamma_p"]
+    else:
+        # Start at basal steady state; the curve rises further at t_on.
+        P0 = eff_beta * basal_frac / cfg["gamma_p"]
+    y0 = [r0] * n_inputs + [P0]
     sol = solve_ivp(rhs, (0.0, t_end), y0=y0, t_eval=t_eval, method="RK45", rtol=1e-6, atol=1e-8)
     return sol, t_eval, plan, n_inputs
 
@@ -233,7 +281,7 @@ def _simulate_negative_feedback(spec: IntentSpec, cfg: dict) -> Simulation:
     k, n = cfg["k"], cfg["n"]
 
     if spec.triggers:
-        plan = _input_plan(spec)
+        plan = _input_plan(spec, cfg)
         t_on = plan[0]["t_on"]
         present = plan[0]["present"]
         mode = plan[0]["mode"]
@@ -280,7 +328,7 @@ def _simulate_positive_feedback(spec: IntentSpec, cfg: dict) -> Simulation:
     k, n = cfg["k"], cfg["n"]
 
     if spec.triggers:
-        plan = _input_plan(spec)
+        plan = _input_plan(spec, cfg)
         t_on = plan[0]["t_on"]
         present = plan[0]["present"]
         mode = plan[0]["mode"]
@@ -322,12 +370,16 @@ def _simulate_ffl(spec: IntentSpec, cfg: dict) -> Simulation:
     if not spec.triggers:
         return _simulate_constitutive(spec, cfg)
 
-    plan = _input_plan(spec)
+    plan = _input_plan(spec, cfg)
     t_on = plan[0]["t_on"]
     present = plan[0]["present"]
     mode = plan[0]["mode"]
     k, n = cfg["k"], cfg["n"]
     t_end = cfg["t_end"]
+
+    promoter_id = system_for_inducer(plan[0]["inducer"])["promoter"]
+    basal_frac, max_expr = library.promoter_kinetics(promoter_id)
+    eff_beta = cfg["beta_p"] * max_expr * cfg["rbs_efficiency"]
 
     def rhs(t, y):
         R, P = max(y[0], 0.0), max(y[1], 0.0)
@@ -336,13 +388,14 @@ def _simulate_ffl(spec: IntentSpec, cfg: dict) -> Simulation:
         # Path 2: regulator directly activates output (coherent FFL - sign-sensitive delay)
         d2 = (R / k) ** n / (1.0 + (R / k) ** n)
         f = 0.5 * d1 + 0.5 * d1 * d2                # coherent type-1: AND-like with delay
+        f_eff = basal_frac + (1.0 - basal_frac) * f
         dR = cfg["beta_r"] - cfg["gamma_r"] * R
-        dP = cfg["beta_p"] * f - cfg["gamma_p"] * P
+        dP = eff_beta * f_eff - cfg["gamma_p"] * P
         return [dR, dP]
 
     t_eval = np.linspace(0.0, t_end, N_POINTS)
     r0 = cfg["beta_r"] / cfg["gamma_r"]
-    y0 = [r0, 0.0]
+    y0 = [r0, eff_beta * basal_frac / cfg["gamma_p"]]
     sol = solve_ivp(rhs, (0.0, t_end), y0=y0, t_eval=t_eval, method="RK45")
 
     output_part = library.get_part(spec.output) or {}
@@ -361,12 +414,16 @@ def _simulate_band_pass(spec: IntentSpec, cfg: dict) -> Simulation:
     if not spec.triggers:
         return _simulate_constitutive(spec, cfg)
 
-    plan = _input_plan(spec)
+    plan = _input_plan(spec, cfg)
     t_on = plan[0]["t_on"]
     present = plan[0]["present"]
     mode = plan[0]["mode"]
     k, n = cfg["k"], cfg["n"]
     t_end = cfg["t_end"]
+
+    promoter_id = system_for_inducer(plan[0]["inducer"])["promoter"]
+    basal_frac, max_expr = library.promoter_kinetics(promoter_id)
+    eff_beta = cfg["beta_p"] * max_expr * cfg["rbs_efficiency"]
 
     # Sweep inducer from 0 to I_MAX over time (ramp) to see band-pass behaviour
     def rhs(t, y):
@@ -375,14 +432,15 @@ def _simulate_band_pass(spec: IntentSpec, cfg: dict) -> Simulation:
         d_low = _drive(mode, R, inducer_ramp, k, n)         # main activation
         d_high = (H / k) ** n / (1.0 + (H / k) ** n)       # high-dose repression
         f = d_low * (1.0 - d_high)                           # band-pass
+        f_eff = basal_frac + (1.0 - basal_frac) * f
         dR = cfg["beta_r"] - cfg["gamma_r"] * R
-        dH = cfg["beta_p"] * 0.3 * d_low - cfg["gamma_p"] * H   # high-dose repressor accumulates
-        dP = cfg["beta_p"] * f - cfg["gamma_p"] * P
+        dH = eff_beta * 0.3 * d_low - cfg["gamma_p"] * H   # high-dose repressor accumulates
+        dP = eff_beta * f_eff - cfg["gamma_p"] * P
         return [dR, dH, dP]
 
     t_eval = np.linspace(0.0, t_end, N_POINTS)
     r0 = cfg["beta_r"] / cfg["gamma_r"]
-    y0 = [r0, 0.0, 0.0]
+    y0 = [r0, 0.0, eff_beta * basal_frac / cfg["gamma_p"]]
     sol = solve_ivp(rhs, (0.0, t_end), y0=y0, t_eval=t_eval, method="RK45")
 
     output_part = library.get_part(spec.output) or {}
@@ -470,9 +528,25 @@ def simulate(spec: IntentSpec, params: Optional[SimParams] = None) -> Simulation
     ]
     for idx, inp in enumerate(plan):
         reg_part = library.get_part(inp["regulator"]) or {}
+        # Plot the effective regulator fraction that actually drives the reporter.
+        # Total R is constant (initialized at SS), but the free/active form changes
+        # with inducer level and is the quantity that controls reporter output.
+        if inp["mode"] == "derepress":
+            eff_vals = [
+                sol.y[idx][i] / (1.0 + (_step(t, inp["t_on"], inp["present"], cfg["i_max"]) / KI) ** M)
+                for i, t in enumerate(t_eval)
+            ]
+            label = f"{inp['regulator']} (free)"
+        else:
+            eff_vals = [
+                sol.y[idx][i] * (_step(t, inp["t_on"], inp["present"], cfg["i_max"]) / KI) /
+                (1.0 + _step(t, inp["t_on"], inp["present"], cfg["i_max"]) / KI)
+                for i, t in enumerate(t_eval)
+            ]
+            label = f"{inp['regulator']} (active)"
         series.append(Series(
-            name=inp["regulator"],
-            values=[round(float(v), 4) for v in sol.y[idx]],
+            name=label,
+            values=[round(float(v), 4) for v in eff_vals],
             color=reg_part.get("color"),
         ))
     for inp in plan:
@@ -485,6 +559,74 @@ def simulate(spec: IntentSpec, params: Optional[SimParams] = None) -> Simulation
         ))
 
     return Simulation(t=[round(float(t), 3) for t in t_eval], series=series)
+
+
+# --------------------------------------------------------------------------- #
+# Dose-response: steady-state output vs log-spaced inducer concentration
+# --------------------------------------------------------------------------- #
+def dose_response(
+    spec: IntentSpec,
+    n_doses: int = 50,
+    params: Optional[SimParams] = None,
+) -> DoseResponse:
+    """Compute steady-state reporter vs. log-spaced inducer concentration.
+
+    Band-pass filter returns a non-monotonic curve peaking at intermediate dose.
+    Inducible patterns return a monotonic sigmoid.  Repressible/not_gate return
+    an inverse sigmoid (high output at low dose, decreasing with more inducer).
+    """
+    if not spec.triggers:
+        raise ValueError("dose_response requires at least one trigger.")
+
+    cfg = _resolve(params, spec.organism)
+    k, n_hill = cfg["k"], cfg["n"]
+    R_ss = cfg["beta_r"] / cfg["gamma_r"]
+
+    trig = spec.triggers[0]
+    sys = system_for_inducer(trig.inducer)
+    if sys is None:
+        raise ValueError(f"No inducible system for '{trig.inducer}'.")
+    mode = sys["mode"]
+    promoter_id = sys["promoter"]
+    basal_frac, max_expr = library.promoter_kinetics(promoter_id)
+    eff_beta = cfg["beta_p"] * max_expr * cfg["rbs_efficiency"]
+
+    # Log-spaced sweep: 1% of Hill K up to 20× i_max
+    I_lo = max(cfg["k"] * 0.01, 1e-3)
+    I_hi = cfg["i_max"] * 20.0
+    doses = np.logspace(np.log10(I_lo), np.log10(I_hi), n_doses)
+
+    repressible = spec.pattern in ("repressible_expression", "not_gate")
+    outputs: list[float] = []
+
+    if spec.pattern == "band_pass_filter":
+        # Two-arm SS: activation arm drives output; high-dose repressor accumulates
+        # and suppresses it, creating a peak at intermediate inducer levels.
+        for I in doses:
+            d_low = _drive(mode, R_ss, I, k, n_hill)
+            H_ss = eff_beta * 0.3 * d_low / cfg["gamma_p"]
+            d_high = (H_ss / k) ** n_hill / (1.0 + (H_ss / k) ** n_hill)
+            f = d_low * (1.0 - d_high)
+            f_eff = basal_frac + (1.0 - basal_frac) * f
+            P_ss = eff_beta * f_eff / cfg["gamma_p"]
+            outputs.append(round(float(max(P_ss, 0.0)), 4))
+    else:
+        for I in doses:
+            d = _drive(mode, R_ss, I, k, n_hill)
+            # Repressible/not_gate: output is high at zero inducer and falls as
+            # inducer drives a repressor that suppresses the output promoter.
+            if repressible:
+                d = 1.0 - d
+            f_eff = basal_frac + (1.0 - basal_frac) * d
+            P_ss = eff_beta * f_eff / cfg["gamma_p"]
+            outputs.append(round(float(max(P_ss, 0.0)), 4))
+
+    return DoseResponse(
+        dose=[round(float(d), 6) for d in doses],
+        output=outputs,
+        inducer=trig.inducer,
+        reporter=spec.output,
+    )
 
 
 # --------------------------------------------------------------------------- #

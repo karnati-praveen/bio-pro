@@ -1,0 +1,58 @@
+name: Test & Lint
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: Python tests + Node build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Python ────────────────────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/requirements.txt
+
+      - name: Install Python dependencies
+        working-directory: src
+        run: pip install -r requirements.txt pytest
+
+      - name: Smoke-test imports
+        working-directory: src
+        env:
+          LLM_PARSER: "off"
+        run: python -c "import main"
+
+      - name: Run pytest
+        working-directory: src
+        env:
+          LLM_PARSER: "off"
+        run: pytest -q
+
+      # ── Node / frontend ───────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: src
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: src
+        env:
+          VITE_API_BASE_URL: "http://127.0.0.1:8000"
+        run: npm run build

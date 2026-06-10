@@ -1,9 +1,12 @@
 """Build annotated BioPython SeqRecords from an assembled circuit.
 
 One record per transcription unit. Each part with a sequence becomes a labelled
-``SeqFeature`` at its offset within the unit. Parts without a sequence (the synthetic
-pAND/pOR logic promoters) are skipped in the base string but still noted as a
-zero-length ``misc_feature`` so the annotation is honest about the gap.
+``SeqFeature`` at its offset within the unit. Parts without a catalogued sequence
+(e.g. the synthetic pAND/pOR logic-gate promoters) receive a poly-N placeholder of
+``_PLACEHOLDER_LEN`` bases so the record remains structurally complete. The feature's
+/note qualifier documents the substitution explicitly, and a record-level COMMENT is
+added when any placeholder was used — downstream tools should treat those Ns as
+unknown sequence, not real DNA.
 """
 
 from Bio.Seq import Seq
@@ -16,6 +19,17 @@ from shared.schemas.schemas import CompileResponse
 # Standard BioBrick flanking sequences (EcoRI-XbaI prefix, SpeI-PstI suffix)
 BIOBRICK_PREFIX = "GAATTCGCGGCCGCTTCTAGA"
 BIOBRICK_SUFFIX = "TACTAGTAGCGGCCGCTGCAG"
+
+# Placeholder for parts with no catalogued sequence (e.g. synthetic logic promoters).
+# 20 Ns is the minimum length that keeps feature locations non-degenerate.
+_PLACEHOLDER_LEN = 20
+_PLACEHOLDER_SEQ = "N" * _PLACEHOLDER_LEN
+_PLACEHOLDER_COMMENT = (
+    "One or more parts in this transcription unit lack a catalogued sequence. "
+    f"A {_PLACEHOLDER_LEN}-nt poly-N placeholder has been substituted at each such "
+    "position (marked SYNTHETIC_PLACEHOLDER in the /note qualifier). "
+    "Replace Ns with the actual sequence before synthesis."
+)
 
 # Map our part types to GenBank feature keys.
 _FEATURE_KEY = {
@@ -33,6 +47,7 @@ def tu_records(response: CompileResponse) -> list[SeqRecord]:
         seq_str = BIOBRICK_PREFIX
         features: list[SeqFeature] = []
         offset = len(BIOBRICK_PREFIX)
+        has_placeholders = False
 
         # Prefix feature annotation
         features.append(SeqFeature(
@@ -51,12 +66,16 @@ def tu_records(response: CompileResponse) -> list[SeqRecord]:
                 "note": (part or {}).get("description", part_id),
             }
             if not part_seq:
-                features.append(SeqFeature(
-                    FeatureLocation(offset, offset),
-                    type="misc_feature",
-                    qualifiers={**qualifiers, "note": f"{part_id} (no sequence)"},
-                ))
-                continue
+                has_placeholders = True
+                part_seq = _PLACEHOLDER_SEQ
+                key = "misc_feature"
+                qualifiers = {
+                    "label": part_id,
+                    "note": (
+                        f"SYNTHETIC_PLACEHOLDER: {part_id} has no catalogued sequence; "
+                        f"{_PLACEHOLDER_LEN} Ns substituted for structural completeness"
+                    ),
+                }
             features.append(SeqFeature(
                 FeatureLocation(offset, offset + len(part_seq)),
                 type=key,
@@ -81,5 +100,7 @@ def tu_records(response: CompileResponse) -> list[SeqRecord]:
         )
         record.annotations["molecule_type"] = "DNA"
         record.annotations["topology"] = "linear"
+        if has_placeholders:
+            record.annotations["comment"] = _PLACEHOLDER_COMMENT
         records.append(record)
     return records

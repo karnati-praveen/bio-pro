@@ -21,6 +21,7 @@ const TYPES = {
   notebook: { editor: "notebook", language: "markdown", icon: "📓" },
 };
 
+
 const FALLBACK = { editor: "circuit", language: "biopro", icon: "📄" };
 
 function extOf(filePath) {
@@ -47,6 +48,7 @@ export function iconForFile(filePath, editorType) {
   const byEditor = {
     circuit: "🧬", sequence: "🧬", molecule: "⚗️",
     protocol: "📋", simulation: "📊", pathway: "🕸️", notebook: "📓",
+    plasmid: "🔬",
   };
   return byEditor[editorType] ?? "📄";
 }

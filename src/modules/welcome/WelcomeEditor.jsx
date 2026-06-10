@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTabStore } from "../../shared/stores/tabStore.js";
 import { useCircuitStore } from "../../shared/stores/circuitStore.js";
 import { useProjectStore } from "../../shared/stores/projectStore.js";
+import { listDesigns, loadVersion } from "../../shared/lib/api/client.js";
 
 const EXAMPLES = [
   {
@@ -71,6 +73,80 @@ function openTab(tabs, circuits, item) {
     circuits.ensure(id, item.content);
     circuits.setDsl(id, item.content);
   }
+}
+
+const CLEARED_KEY = "bio-cleared-design-ids";
+
+function getClearedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(CLEARED_KEY) || "[]")); }
+  catch { return new Set(); }
+}
+
+function RecentDesigns() {
+  const tabs = useTabStore.getState();
+  const circuits = useCircuitStore.getState();
+  const [clearedIds, setClearedIds] = useState(getClearedIds);
+  const [loading, setLoading] = useState(null); // design id being opened
+
+  const { data: allDesigns = [] } = useQuery({
+    queryKey: ["designs"],
+    queryFn: listDesigns,
+    staleTime: 30_000,
+  });
+
+  const visible = allDesigns.filter((d) => !clearedIds.has(d.id)).slice(0, 5);
+
+  if (visible.length === 0) return null;
+
+  function clearRecents() {
+    const ids = new Set(visible.map((d) => d.id));
+    const next = new Set([...clearedIds, ...ids]);
+    setClearedIds(next);
+    localStorage.setItem(CLEARED_KEY, JSON.stringify([...next]));
+  }
+
+  async function openDesign(design) {
+    if (loading !== null) return;
+    setLoading(design.id);
+    try {
+      const v = await loadVersion(design.id, design.latest_version);
+      const title = design.name.endsWith(".biopro") ? design.name : design.name + ".biopro";
+      const dsl = v.request?.goal || "";
+      const id = tabs.openTab({ type: "circuit", title, content: dsl });
+      circuits.ensure(id, dsl);
+      circuits.loadResult(id, v.response, v.request);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  return (
+    <section className="welcome-section">
+      <h2 className="welcome-section-title">
+        Recent designs
+        <button className="welcome-clear-recents link-btn" onClick={clearRecents}>
+          Clear recents
+        </button>
+      </h2>
+      <div className="welcome-recent-designs">
+        {visible.map((d) => (
+          <button
+            key={d.id}
+            className="welcome-design-card"
+            onClick={() => openDesign(d)}
+            disabled={loading === d.id}
+          >
+            <div className="welcome-design-name">{d.name}</div>
+            <div className="welcome-design-meta">
+              <span>{new Date(d.updated_at).toLocaleDateString()}</span>
+              <span>{d.reporter_count ?? 0} reporter{(d.reporter_count ?? 0) !== 1 ? "s" : ""}</span>
+              <span>{d.inducer_count ?? 0} inducer{(d.inducer_count ?? 0) !== 1 ? "s" : ""}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export default function WelcomeEditor() {
@@ -145,6 +221,9 @@ export default function WelcomeEditor() {
             ))}
           </div>
         </section>
+
+        {/* Recent designs */}
+        <RecentDesigns />
 
         {/* Recent */}
         {recentTabs.length > 0 && (

@@ -277,6 +277,7 @@ export default function CircuitEditor({ tabId, tab }) {
                     stochastic={session?.stochastic}
                     onRunStochastic={(threshold) => runStochastic(tabId, threshold)}
                     stochLoading={session?.stochLoading}
+                    compileResult={result}
                   />
                 </div>
               )}

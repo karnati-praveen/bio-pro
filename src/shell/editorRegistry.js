@@ -8,13 +8,17 @@ import ProtocolEditor from "../modules/protocol/ProtocolEditor.jsx";
 import NotebookEditor from "../modules/experiments/NotebookEditor.jsx";
 import PathwayEditor from "../modules/pathway/PathwayEditor.jsx";
 import PrimersEditor from "../modules/primers/PrimersEditor.jsx";
+import GuideDesigner from "../modules/crispr/GuideDesigner.jsx";
 import WelcomeEditor from "../modules/welcome/WelcomeEditor.jsx";
+import PlasmidMap from "../modules/seqmap/PlasmidMap.jsx";
+import CodonOptimizer from "../modules/codon/CodonOptimizer.jsx";
 import PlaceholderEditor from "../shared/ui/PlaceholderEditor.jsx";
 import WebviewEditor from "../shared/ui/WebviewEditor.jsx";
 
 const REGISTRY = {
-  welcome: WelcomeEditor,
-  circuit: CircuitEditor,
+  welcome:  WelcomeEditor,
+  circuit:  CircuitEditor,
+  plasmid:  PlasmidMap,
   sequence: SequenceEditor,
   webview: WebviewEditor,
   simulation: SimulationEditor,
@@ -25,6 +29,8 @@ const REGISTRY = {
   notebook: NotebookEditor,
   pathway: PathwayEditor,
   primers: PrimersEditor,
+  crispr:  GuideDesigner,
+  codon:   CodonOptimizer,
 };
 
 export function resolveEditor(type) {

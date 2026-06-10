@@ -144,6 +144,9 @@ export const seqGC          = (sequence, window = 50) => postJson("/api/sequence
 export const seqOrfs        = (sequence, min_len = 90) => postJson("/api/sequence/orfs", { sequence, min_len });
 export const seqRestriction = (sequence, enzymes = null) => postJson("/api/sequence/restriction", { sequence, enzymes });
 
+// ---- Plasmid map (seqmap) -------------------------------------------------- //
+export const seqmapRender = (payload) => postJson("/api/seqmap/render", payload);
+
 // ---- Parts library extensions (Module 3) ---------------------------------- //
 export const createPart        = (part) => postJson("/api/parts", part);
 export const importParts       = (filename, content) => postJson("/api/parts/import", { filename, content });
@@ -152,6 +155,7 @@ export const fetchCrossReactivity = () => fetch(`${BASE_URL}/api/parts/cross-rea
 // ---- Simulation Workbench (Module 4) -------------------------------------- //
 export const simulateOde   = (compileResult, params) => postJson("/api/simulate", { compile_result: compileResult, params });
 export const sensitivity   = (compileResult) => postJson("/api/simulate/sensitivity", compileResult);
+export const doseResponse  = (compileResult, nDoses = 50, params = null) => postJson("/api/simulate/dose-response", { compile_result: compileResult, n_doses: nDoses, params });
 export const saveSimRun    = (body) => postJson("/api/simulations", body);
 export const listSimRuns   = () => fetch(`${BASE_URL}/api/simulations`).then(handle);
 export const getSimRun     = (id) => fetch(`${BASE_URL}/api/simulations/${id}`).then(handle);
@@ -172,8 +176,16 @@ export async function chemSdf(query, input_type = "smiles", dim = "3d") {
   return res.text();
 }
 
+// ---- Codon optimization ------------------------------------------------------ //
+export const codonOptimize = (body) => postJson("/api/codon/optimize", body);
+
 // ---- Primer design (Module 8) --------------------------------------------- //
 export const designPrimers = (sequence, opts = {}) => postJson("/api/primers/design", { sequence, ...opts });
+
+// ---- CRISPR guide RNA design ---------------------------------------------- //
+export const designGuides = (sequence, enzyme = "SpCas9", strand = "both", max_guides = 20) =>
+  postJson("/api/crispr/guides", { sequence, enzyme, strand, max_guides });
+export const listCrisprEnzymes = () => fetch(`${BASE_URL}/api/crispr/enzymes`).then(handle);
 
 // ---- Protocol generator (Module 7) ---------------------------------------- //
 export const generateProtocol = (compileResult, method = "gibson") =>

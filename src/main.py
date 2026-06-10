@@ -15,6 +15,7 @@ Features:
 
 import io
 import json
+from collections import deque
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -25,6 +26,8 @@ from pydantic import BaseModel
 from modules.parts import library
 from shared.schemas.schemas import (
     AssemblyRequest,
+    CircuitEdge,
+    CircuitNode,
     CompileRequest,
     CompileResponse,
     IntentSpec,
@@ -53,6 +56,9 @@ from modules.protocol import api as protocol_router
 from modules.pathway import api as pathway_router
 from modules.experiments import api as experiments_router
 from modules.git import api as git_router
+from modules.seqmap import api as seqmap_router
+from modules.crispr import api as crispr_router
+from modules.codon import api as codon_router
 
 
 @asynccontextmanager
@@ -86,6 +92,9 @@ app.include_router(protocol_router.router)
 app.include_router(pathway_router.router)
 app.include_router(experiments_router.router)
 app.include_router(git_router.router)
+app.include_router(seqmap_router.router)
+app.include_router(codon_router.router)
+app.include_router(crispr_router.router)
 
 
 # --------------------------------------------------------------------------- #
@@ -454,18 +463,94 @@ def export_version(design_id: int, version_no: int, format: str = "genbank") -> 
     version = repo.get_version(design_id, version_no)
     if version is None:
         raise HTTPException(status_code=404, detail="Version not found.")
-    try:
-        json.loads(version["request_json"])
-        response_data = json.loads(version["response_json"])
-    except (json.JSONDecodeError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Stored version data is not valid JSON: {exc}",
-        ) from exc
-    resp = CompileResponse.model_validate(response_data)
+    resp = CompileResponse.model_validate(version["response"])
     return _export_response(resp, format, f"design{design_id}_v{version_no}")
 
 
 @app.post("/api/export")
 def export_inline(response: CompileResponse, format: str = "genbank") -> Response:
     return _export_response(response, format, "design")
+
+
+# --------------------------------------------------------------------------- #
+# Circuit → DSL (reverse-compile)
+# --------------------------------------------------------------------------- #
+class CircuitToDslRequest(BaseModel):
+    nodes: list[CircuitNode]
+    edges: list[CircuitEdge]
+
+
+def _edge_sign(kind: str) -> int:
+    return -1 if kind in ("repression", "inhibition") else 1
+
+
+def _trace_sign(edges: list[CircuitEdge], start: str, end: str) -> int | None:
+    """BFS from start to end; returns net regulatory sign, or None if no path."""
+    queue: deque[tuple[str, int]] = deque([(start, 1)])
+    visited: set[str] = set()
+    while queue:
+        node, sign = queue.popleft()
+        if node in visited:
+            continue
+        visited.add(node)
+        if node == end:
+            return sign
+        for e in edges:
+            if e.source == node and e.target not in visited:
+                queue.append((e.target, sign * _edge_sign(e.kind)))
+    return None
+
+
+@app.post("/api/circuit/to-dsl")
+def circuit_to_dsl(req: CircuitToDslRequest) -> dict:
+    """Convert a ReactFlow circuit graph back into .biopro DSL lines."""
+    reporters = [n for n in req.nodes if n.reporter or n.type == "reporter"]
+    inducers  = [n for n in req.nodes if n.type == "inducer"]
+
+    lines: list[str] = []
+    for rep in reporters:
+        rid = rep.id
+
+        # Detect self-feedback: outgoing edge from reporter that loops back.
+        feedback: str | None = None
+        for e in req.edges:
+            if e.source != rid:
+                continue
+            other = [x for x in req.edges if not (x.source == rid and x.target == e.target)]
+            back = _trace_sign(other, e.target, rid)
+            if back is not None:
+                feedback = "negative" if _edge_sign(e.kind) * back < 0 else "positive"
+                break
+
+        # Collect inducer → reporter effects.
+        effects: list[tuple[str, int]] = []
+        for ind in inducers:
+            sign = _trace_sign(req.edges, ind.id, rid)
+            if sign is not None:
+                effects.append((ind.id, sign))
+
+        # Detect logic gate type (AND/OR/NAND/NOR) on the path to reporter.
+        gate_label: str | None = None
+        for n in req.nodes:
+            if n.type == "logic" and n.label in ("AND", "OR", "NAND", "NOR"):
+                if _trace_sign(req.edges, n.id, rid) is not None:
+                    gate_label = n.label
+                    break
+
+        if not effects:
+            suffix = f" with {feedback} feedback" if feedback else ""
+            lines.append(f"express {rid} constitutively{suffix}")
+        elif len(effects) == 1:
+            iid, sign = effects[0]
+            if feedback:
+                lines.append(f"express {rid} under {iid} with {feedback} feedback")
+            elif sign > 0:
+                lines.append(f"express {rid} under {iid}")
+            else:
+                lines.append(f"express {rid} without {iid}")
+        else:
+            i1, i2 = effects[0][0], effects[1][0]
+            op = "or" if gate_label in ("OR", "NOR") else "and"
+            lines.append(f"express {rid} when {i1} {op} {i2}")
+
+    return {"dsl": "\n".join(lines) or "# no circuit to convert"}

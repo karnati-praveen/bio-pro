@@ -58,3 +58,24 @@ def inducers() -> list[dict]:
 def compatible_parts(host: str) -> list[dict]:
     """Return all parts compatible with a given host organism."""
     return all_parts(host=host)
+
+
+def promoter_kinetics(promoter_id: str) -> tuple[float, float]:
+    """Return (basal_frac, max_expr) for a promoter, with safe defaults.
+
+    basal_frac : fractional leak floor = basal_expression / max_expression, in [0, 1].
+                 pBAD=0.10, pLac=0.05, pTet=0.02 — used as the f=0 floor in the ODE.
+    max_expr   : max_expression (a.u.) — scales beta_p relative to the global default.
+
+    Defaults when the part is missing or has no kinetic_parameters: (0.0, 1.0).
+    """
+    part = get_part(promoter_id)
+    if part is None:
+        return (0.0, 1.0)
+    kp = part.get("kinetic_parameters") or {}
+    basal = float(kp.get("basal_expression", 0.0))
+    max_expr = float(kp.get("max_expression", 1.0))
+    if max_expr <= 0:
+        max_expr = 1.0
+    basal_frac = min(basal / max_expr, 1.0)
+    return (basal_frac, max_expr)
