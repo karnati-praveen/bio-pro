@@ -55,12 +55,14 @@ class SaveRunRequest(BaseModel):
     params: dict = {}
     summary: dict = {}
     design_id: Optional[int] = None
+    project_id: Optional[int] = None
 
 
 @router.post("/simulations")
 def save_run(body: SaveRunRequest) -> dict:
     return repo.save_simulation_run(
-        body.label, body.mode, body.organism, body.params, body.summary, body.design_id
+        body.label, body.mode, body.organism, body.params, body.summary,
+        body.design_id, body.project_id,
     )
 
 

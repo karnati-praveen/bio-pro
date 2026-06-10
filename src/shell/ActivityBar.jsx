@@ -1,15 +1,16 @@
 import {
   VscFiles, VscLibrary, VscSearch, VscSourceControl,
-  VscGraph, VscSettingsGear, VscExtensions, VscBeaker,
+  VscGraph, VscSettingsGear, VscExtensions, VscBeaker, VscBook,
 } from "react-icons/vsc";
 import { useUiStore } from "../shared/stores/uiStore.js";
 
 const STATIC_ITEMS = [
-  { id: "explorer", title: "Explorer (Ctrl+Shift+E)", Icon: VscFiles },
-  { id: "parts",    title: "Parts Library",            Icon: VscBeaker },
-  { id: "search",   title: "Search (Ctrl+Shift+F)",    Icon: VscSearch },
-  { id: "git",      title: "Source Control",            Icon: VscSourceControl },
-  { id: "sim",      title: "Simulation",                Icon: VscGraph },
+  { id: "explorer",  title: "Explorer (Ctrl+Shift+E)",      Icon: VscFiles },
+  { id: "parts",     title: "Parts Library",                 Icon: VscBeaker },
+  { id: "templates", title: "Template Gallery (Ctrl+Shift+T)", Icon: VscBook },
+  { id: "search",    title: "Search (Ctrl+Shift+F)",         Icon: VscSearch },
+  { id: "git",       title: "Source Control",                 Icon: VscSourceControl },
+  { id: "sim",       title: "Simulation",                     Icon: VscGraph },
 ];
 
 export default function ActivityBar() {

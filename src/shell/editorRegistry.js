@@ -12,11 +12,15 @@ import GuideDesigner from "../modules/crispr/GuideDesigner.jsx";
 import WelcomeEditor from "../modules/welcome/WelcomeEditor.jsx";
 import PlasmidMap from "../modules/seqmap/PlasmidMap.jsx";
 import CodonOptimizer from "../modules/codon/CodonOptimizer.jsx";
+import AlignmentView from "../modules/align/AlignmentView.jsx";
+import AssaySimulator from "../modules/assays/AssaySimulator.jsx";
+import TemplatesEditor from "../modules/templates/TemplatesEditor.jsx";
 import PlaceholderEditor from "../shared/ui/PlaceholderEditor.jsx";
 import WebviewEditor from "../shared/ui/WebviewEditor.jsx";
 
 const REGISTRY = {
-  welcome:  WelcomeEditor,
+  welcome:   WelcomeEditor,
+  templates: TemplatesEditor,
   circuit:  CircuitEditor,
   plasmid:  PlasmidMap,
   sequence: SequenceEditor,
@@ -31,6 +35,8 @@ const REGISTRY = {
   primers: PrimersEditor,
   crispr:  GuideDesigner,
   codon:   CodonOptimizer,
+  alignment: AlignmentView,
+  assay:     AssaySimulator,
 };
 
 export function resolveEditor(type) {

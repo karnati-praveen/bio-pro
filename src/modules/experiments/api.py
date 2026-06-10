@@ -12,7 +12,9 @@ router = APIRouter(prefix="/api/experiments", tags=["experiments"])
 
 class ExperimentBody(BaseModel):
     title: str = "Untitled experiment"
+    project_id: Optional[int] = None
     design_id: Optional[int] = None
+    design_version_no: Optional[int] = None
     exp_type: str = "expression"
     date: Optional[str] = None
     protocol_ref: Optional[str] = None

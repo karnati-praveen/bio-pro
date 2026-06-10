@@ -1,12 +1,15 @@
-import { VscError, VscWarning, VscSourceControl, VscColorMode } from "react-icons/vsc";
+import { useState } from "react";
+import { VscError, VscWarning, VscSourceControl, VscColorMode, VscProject } from "react-icons/vsc";
 import { useUiStore } from "../shared/stores/uiStore.js";
 import { useTabStore } from "../shared/stores/tabStore.js";
 import { useCircuitStore } from "../shared/stores/circuitStore.js";
 import { useGitStore } from "../modules/git/gitStore.js";
+import { useBioProjectStore } from "../shared/stores/bioProjectStore.js";
 import { typeInfoForFile } from "../shared/lib/fileTypes.js";
 import NotificationStrip from "../shared/ui/NotificationStrip.jsx";
 import InputBoxOverlay from "../shared/ui/InputBoxOverlay.jsx";
 import ToastContainer from "../shared/ui/ToastContainer.jsx";
+import ProjectPickerModal from "../shared/ui/ProjectPickerModal.jsx";
 
 export default function StatusBar() {
   const status      = useUiStore((s) => s.status);
@@ -19,6 +22,9 @@ export default function StatusBar() {
   const byTab     = useCircuitStore((s) => s.byTab);
   const session   = activeTab ? byTab[activeTab.id] : null;
   const gitBranch = useGitStore((s) => s.branch);
+
+  const activeProject = useBioProjectStore((s) => s.activeProject);
+  const [showPicker, setShowPicker] = useState(false);
 
   const findings  = session?.findings || [];
   const errors    = findings.filter((f) => f.severity === "error").length;
@@ -34,6 +40,7 @@ export default function StatusBar() {
       <ToastContainer />
       <NotificationStrip />
       <InputBoxOverlay />
+      {showPicker && <ProjectPickerModal onClose={() => setShowPicker(false)} />}
       <div className="status-bar">
         <div className="status-left">
           <button
@@ -52,6 +59,14 @@ export default function StatusBar() {
               <span>{gitBranch || "main"}</span>
             </span>
           )}
+          <button
+            className={`status-item status-project${activeProject ? " status-project-active" : ""}`}
+            onClick={() => setShowPicker(true)}
+            title={activeProject ? `Project: ${activeProject.name} — click to switch` : "No project — click to open or create one"}
+          >
+            <VscProject size={12} />
+            <span>{activeProject ? activeProject.name : "No project"}</span>
+          </button>
         </div>
 
         <div className="status-right">

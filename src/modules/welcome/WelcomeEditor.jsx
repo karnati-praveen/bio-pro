@@ -4,56 +4,7 @@ import { useTabStore } from "../../shared/stores/tabStore.js";
 import { useCircuitStore } from "../../shared/stores/circuitStore.js";
 import { useProjectStore } from "../../shared/stores/projectStore.js";
 import { listDesigns, loadVersion } from "../../shared/lib/api/client.js";
-
-const EXAMPLES = [
-  {
-    id: "inducible-gfp",
-    title: "Inducible GFP",
-    desc: "Classic IPTG-inducible GFP reporter",
-    icon: "🧬",
-    accent: "var(--ft-circuit)",
-    type: "circuit",
-    content: "Express GFP when IPTG is present",
-  },
-  {
-    id: "toggle-switch",
-    title: "Toggle Switch",
-    desc: "Bistable switch with IPTG and aTc",
-    icon: "🔀",
-    accent: "var(--ft-sequence)",
-    type: "circuit",
-    content: "Toggle switch with IPTG and aTc",
-  },
-  {
-    id: "repressilator",
-    title: "Repressilator",
-    desc: "3-gene oscillator (Elowitz & Leibler)",
-    icon: "🔄",
-    accent: "var(--ft-simulation)",
-    type: "circuit",
-    content: "Repressilator oscillator with three repressors",
-  },
-  {
-    id: "aspirin",
-    title: "Aspirin Molecule",
-    desc: "Acetylsalicylic acid — 2D/3D + Lipinski",
-    icon: "💊",
-    accent: "var(--ft-chemistry)",
-    type: "molecule",
-    content: "CC(=O)Oc1ccccc1C(=O)O",
-    meta: { smiles: "CC(=O)Oc1ccccc1C(=O)O", name: "Aspirin" },
-  },
-  {
-    id: "glycolysis",
-    title: "Glycolysis FBA",
-    desc: "Upper glycolysis flux balance analysis",
-    icon: "⚗️",
-    accent: "var(--ft-pathway)",
-    type: "pathway",
-    content: "",
-    meta: { template: "upper_glycolysis" },
-  },
-];
+import TemplateGallery from "../templates/TemplateGallery.jsx";
 
 const QUICK_STARTS = [
   { id: "circuit",  label: "New Circuit",    icon: "🧬", cmd: "circuit" },
@@ -61,19 +12,6 @@ const QUICK_STARTS = [
   { id: "pathway",  label: "New Pathway",    icon: "⚗️", cmd: "pathway" },
   { id: "notebook", label: "New Notebook",   icon: "📓", cmd: "notebook" },
 ];
-
-function openTab(tabs, circuits, item) {
-  const id = tabs.openTab({
-    type: item.type,
-    title: item.id + (item.type === "circuit" ? ".biopro" : item.type === "molecule" ? ".smiles" : "." + item.type),
-    content: item.content,
-    meta: item.meta || {},
-  });
-  if (item.type === "circuit") {
-    circuits.ensure(id, item.content);
-    circuits.setDsl(id, item.content);
-  }
-}
 
 const CLEARED_KEY = "bio-cleared-design-ids";
 
@@ -201,25 +139,18 @@ export default function WelcomeEditor() {
           </div>
         </section>
 
-        {/* Examples */}
+        {/* Template gallery */}
         <section className="welcome-section">
-          <h2 className="welcome-section-title">Examples</h2>
-          <div className="welcome-examples">
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex.id}
-                className="welcome-example-card"
-                style={{ "--ex-accent": ex.accent }}
-                onClick={() => openTab(tabs, circuits, ex)}
-              >
-                <span className="welcome-ex-icon">{ex.icon}</span>
-                <div className="welcome-ex-info">
-                  <div className="welcome-ex-title">{ex.title}</div>
-                  <div className="welcome-ex-desc">{ex.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
+          <h2 className="welcome-section-title">
+            Templates
+            <button
+              className="welcome-clear-recents link-btn"
+              onClick={() => useTabStore.getState().openTab({ type: "templates", title: "Template Gallery", icon: "📚" })}
+            >
+              View all →
+            </button>
+          </h2>
+          <TemplateGallery embedded />
         </section>
 
         {/* Recent designs */}

@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 import { DiffEditor } from "@monaco-editor/react";
 import {
   addVersion,
+  attachDesignToProject,
   diffVersions,
   exportInline,
   listDesigns,
   loadVersion,
   saveDesign,
 } from "../../shared/lib/api/client.js";
+import { useBioProjectStore } from "../../shared/stores/bioProjectStore.js";
 
 const FORMATS = ["genbank", "fasta", "sbol", "json"];
 
@@ -19,6 +21,9 @@ export default function DesignsPanel({ result, request, onLoad }) {
   const [name, setName] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [status, setStatus] = useState(null);
+
+  const activeProjectId = useBioProjectStore((s) => s.activeProjectId);
+  const refreshActive = useBioProjectStore((s) => s.refreshActive);
 
   // { designId: number, versions: number[] } — at most 2 versions from the same design
   const [diffSel, setDiffSel] = useState({ designId: null, versions: [] });
@@ -73,11 +78,16 @@ export default function DesignsPanel({ result, request, onLoad }) {
     try {
       if (activeId) {
         const v = await addVersion(activeId, request, result);
-        setStatus(`Saved v${v.version_no}`);
+        setStatus(`Saved v${v.version_no}${activeProjectId ? ` · project ${activeProjectId}` : ""}`);
+        if (activeProjectId) {
+          await attachDesignToProject(activeProjectId, activeId).catch(() => {});
+          refreshActive();
+        }
       } else {
-        const d = await saveDesign(name || "Untitled design", request, result);
+        const d = await saveDesign(name || "Untitled design", request, result, activeProjectId);
         setActiveId(d.id);
-        setStatus(`Saved "${d.name}" (v1)`);
+        setStatus(`Saved "${d.name}" (v1)${activeProjectId ? ` · project ${activeProjectId}` : ""}`);
+        refreshActive();
       }
       refresh();
     } catch (e) {

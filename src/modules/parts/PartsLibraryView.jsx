@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FixedSizeList } from "react-window";
+import { List } from "react-window";
 import { usePartsStore } from "../../shared/stores/partsStore.js";
 import { useUiStore } from "../../shared/stores/uiStore.js";
 
@@ -145,15 +145,12 @@ export default function PartsLibraryView() {
         {parts && results.length === 0
           ? <div className="explorer-empty">No matching parts</div>
           : (
-            <FixedSizeList
-              height={listHeight}
-              itemCount={results.length}
-              itemSize={58}
-              width="100%"
-              style={{ listStyle: "none", margin: 0, padding: 0 }}
-            >
-              {Row}
-            </FixedSizeList>
+            <List
+              rowCount={results.length}
+              rowHeight={58}
+              rowComponent={Row}
+              style={{ height: listHeight, width: "100%", listStyle: "none", margin: 0, padding: 0 }}
+            />
           )
         }
       </div>

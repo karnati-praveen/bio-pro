@@ -210,6 +210,12 @@ export const updateExperiment = (id, body) => fetch(`${BASE_URL}/api/experiments
 export const deleteExperiment = (id) => fetch(`${BASE_URL}/api/experiments/${id}`, { method: "DELETE" }).then(handle);
 export const fitExperiment    = (simulation, measured) => postJson("/api/experiments/fit", { simulation, measured });
 
+// ---- Assay Simulator ------------------------------------------------------ //
+export const assayFlow  = (simulation, opts = {}) => postJson("/api/assays/flow-cytometry", { simulation, ...opts });
+export const assayPlate = (simulation, opts = {}) => postJson("/api/assays/plate-reader",   { simulation, ...opts });
+export const assayQpcr  = (copyEstimates = [1e6, 1e5, 1e4, 1e3, 1e2]) => postJson("/api/assays/qpcr", { copy_estimates: copyEstimates });
+export const assayGel   = (fragments) => postJson("/api/assays/gel", { fragments });
+
 // ---- Git / Version control (Module 9) ------------------------------------ //
 function gitPost(path, body) {
   return fetch(`${BASE_URL}${path}`, {
@@ -236,17 +242,40 @@ export const gitPush        = (root, remote = "origin", branch = null) => gitPos
 export const gitPull        = (root, remote = "origin", branch = null) => gitPost("/api/git/pull", { root, remote, branch });
 export const gitSuggestMessage = (root, files) => gitPost("/api/git/suggest-message", { root, files });
 
+// ---- Projects ------------------------------------------------------------- //
+export const listProjects = () => fetch(`${BASE_URL}/api/projects`).then(handle);
+export const createBioProject = (name, description = "") =>
+  postJson("/api/projects", { name, description });
+export const getBioProject = (id) => fetch(`${BASE_URL}/api/projects/${id}`).then(handle);
+export const updateBioProject = (id, patch) =>
+  fetch(`${BASE_URL}/api/projects/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  }).then(handle);
+export const deleteBioProject = (id) =>
+  fetch(`${BASE_URL}/api/projects/${id}`, { method: "DELETE" }).then(handle);
+export const attachDesignToProject = (projectId, designId) =>
+  fetch(`${BASE_URL}/api/projects/${projectId}/designs/${designId}`, { method: "PUT" }).then(handle);
+export const attachSimToProject = (projectId, simId) =>
+  fetch(`${BASE_URL}/api/projects/${projectId}/simulations/${simId}`, { method: "PUT" }).then(handle);
+export const attachExperimentToProject = (projectId, expId) =>
+  fetch(`${BASE_URL}/api/projects/${projectId}/experiments/${expId}`, { method: "PUT" }).then(handle);
+export const saveProjectOrder = (body) => postJson("/api/projects/orders", body);
+export const listProjectOrders = (projectId) =>
+  fetch(`${BASE_URL}/api/projects/orders/list${projectId ? `?project_id=${projectId}` : ""}`).then(handle);
+
 // ---- Designs: save / load / version --------------------------------------- //
 export async function listDesigns() {
   return handle(await fetch(`${BASE_URL}/api/designs`));
 }
 
-export async function saveDesign(name, request, response) {
+export async function saveDesign(name, request, response, projectId = null) {
   return handle(
     await fetch(`${BASE_URL}/api/designs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, request, response }),
+      body: JSON.stringify({ name, request, response, project_id: projectId || null }),
     })
   );
 }
@@ -316,6 +345,17 @@ export async function suggestGoals(goal, error, organism, llmConfig) {
   } catch {
     return { suggestions: [] };
   }
+}
+
+// ---- Sequence alignment --------------------------------------------------- //
+export async function alignSequences({ mode = "global", sequences, match = 1, mismatch = -1, gap = -2 }) {
+  return handle(
+    await fetch(`${BASE_URL}/api/align`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, sequences, match, mismatch, gap }),
+    })
+  );
 }
 
 export async function exportInline(response, format) {

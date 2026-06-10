@@ -48,16 +48,22 @@ def _check_reporter_present(circuit: Circuit, findings: list) -> None:
     reporters = [n for n in circuit.nodes if n.reporter]
     if not reporters:
         findings.append(_f("no_reporter", "error",
-            "Circuit has no reporter; nothing observable would be expressed."))
+            "Circuit has no reporter; nothing observable would be expressed.",
+            fix="Add a reporter gene (e.g., GFP, RFP, or mCherry) as the output CDS "
+                "in at least one transcription unit."))
         return
     if len(reporters) > 1:
         findings.append(_f("multiple_reporters", "error",
-            "Expected one reporter, found: " + ", ".join(n.id for n in reporters)))
+            "Expected one reporter, found: " + ", ".join(n.id for n in reporters),
+            target=reporters[0].id,
+            fix="Remove extra reporter nodes and keep exactly one output reporter node."))
     for n in reporters:
         part = library.get_part(n.id)
         if part is None or part.get("role") != "reporter":
             findings.append(_f("bad_reporter", "error",
-                f"Output '{n.id}' is not a reporter CDS in the library.", n.id))
+                f"Output '{n.id}' is not a reporter CDS in the library.", n.id,
+                fix=f"Replace '{n.id}' with a known reporter such as GFP, RFP, "
+                    "mCherry, YFP, or luciferase."))
 
 
 def _check_promoter_regulators(circuit: Circuit, findings: list) -> None:
@@ -70,7 +76,9 @@ def _check_promoter_regulators(circuit: Circuit, findings: list) -> None:
         if regulator and regulator not in node_ids:
             findings.append(_f("orphan_promoter", "error",
                 f"Promoter '{node.id}' is regulated by '{regulator}', "
-                "which is not expressed in the circuit.", node.id))
+                "which is not expressed in the circuit.", node.id,
+                fix=f"Add a CDS expressing '{regulator}' to the circuit, "
+                    f"or replace '{node.id}' with a constitutive promoter (e.g., pJ23119)."))
 
 
 def _check_transcription_units(circuit: Circuit, findings: list) -> None:
@@ -85,14 +93,17 @@ def _check_transcription_units(circuit: Circuit, findings: list) -> None:
             part = library.get_part(pid)
             if part is None:
                 findings.append(_f("unknown_part", "error",
-                    f"TU '{tu.name}' references unknown part '{pid}'.", pid))
+                    f"TU '{tu.name}' references unknown part '{pid}'.", pid,
+                    fix=f"Remove '{pid}' from the TU or register it in the parts "
+                        "library before compiling."))
                 types.append("?")
                 continue
             types.append(part["type"])
         if tuple(types) != _TU_GRAMMAR:
             findings.append(_f("tu_grammar", "error",
                 f"TU '{tu.name}' is not promoter-RBS-CDS-terminator (got {'-'.join(types)}).",
-                tu.name))
+                tu.name,
+                fix=f"Reorder parts in TU '{tu.name}' to: promoter → RBS → CDS → terminator."))
 
 
 def _check_graph_integrity(circuit: Circuit, findings: list) -> None:
@@ -103,11 +114,15 @@ def _check_graph_integrity(circuit: Circuit, findings: list) -> None:
             referenced.add(ep)
             if ep not in node_ids and ep not in _LOGIC_PROMOTER_IDS:
                 findings.append(_f("dangling_edge", "error",
-                    f"Edge references node '{ep}' not in the circuit.", ep))
+                    f"Edge references node '{ep}' not in the circuit.", ep,
+                    fix=f"Remove the edge referencing '{ep}', or add '{ep}' as a node "
+                        "in the circuit."))
     for node in circuit.nodes:
         if node.id not in referenced:
             findings.append(_f("orphan_node", "warning",
-                f"Node '{node.id}' ({node.label}) is not connected to anything.", node.id))
+                f"Node '{node.id}' ({node.label}) is not connected to anything.", node.id,
+                fix=f"Connect '{node.id}' to another part via an edge, or remove it "
+                    "from the circuit if it is not needed."))
 
 
 # --------------------------------------------------------------------------- #
@@ -122,13 +137,18 @@ def _check_input_systems(spec: IntentSpec, findings: list) -> None:
     if constitutive is None or constitutive.get("role") != "constitutive":
         findings.append(_f("bad_regulator_promoter", "error",
             f"Regulator promoter '{REGULATOR_PROMOTER}' is missing or not constitutive.",
-            REGULATOR_PROMOTER))
+            REGULATOR_PROMOTER,
+            fix=f"Ensure '{REGULATOR_PROMOTER}' is registered in the parts library "
+                "with type='promoter' and role='constitutive'."))
 
     for trig in spec.triggers:
         system = system_for_inducer(trig.inducer)
         if system is None:
             findings.append(_f("unsupported_inducer", "error",
-                f"No inducible system for inducer '{trig.inducer}'.", trig.inducer))
+                f"No inducible system for inducer '{trig.inducer}'.", trig.inducer,
+                fix=f"Use a supported inducer (IPTG, aTc, arabinose, AHL, rhamnose, "
+                    f"doxycycline) or register a custom inducible system for "
+                    f"'{trig.inducer}' in the rules module."))
             continue
         promoter = library.get_part(system["promoter"]) or {}
         for field, expected in (
@@ -140,11 +160,16 @@ def _check_input_systems(spec: IntentSpec, findings: list) -> None:
                 findings.append(_f("rule_part_mismatch", "error",
                     f"Promoter '{system['promoter']}' {field}='{promoter.get(field)}', "
                     f"but rule for '{trig.inducer}' expects '{expected}'.",
-                    system["promoter"]))
+                    system["promoter"],
+                    fix=f"Update the '{field}' field on part '{system['promoter']}' to "
+                        f"'{expected}', or choose a different inducible system."))
         if system["mode"] == "activate" and trig.presence == "absent":
             findings.append(_f("induce_off_activator", "warning",
                 f"'{trig.inducer}' uses an activation system; 'absent' means reporter is "
-                "OFF when inducer is added.", trig.inducer))
+                "OFF when inducer is added.", trig.inducer,
+                fix=f"To turn the reporter OFF with inducer present, switch to a "
+                    f"repressor-based system. For an activator, set '{trig.inducer}' "
+                    "presence to 'present' for the ON state."))
 
 
 def _check_host_compatibility(spec: IntentSpec, circuit: Circuit, findings: list) -> None:
@@ -190,7 +215,10 @@ def _check_part_reuse(circuit: Circuit, findings: list) -> None:
         if count > 1 and pid == DEFAULT_TERMINATOR:
             findings.append(_f("repeated_part", "info",
                 f"Part '{pid}' reused in {count} TUs; repeated sequences can recombine in vivo.",
-                pid))
+                pid,
+                fix=f"Use distinct terminator sequences in each TU "
+                    "(e.g., rrnBT1+T2 in one, L3S2P21 in another) to reduce "
+                    "homologous recombination risk."))
 
 
 # --------------------------------------------------------------------------- #

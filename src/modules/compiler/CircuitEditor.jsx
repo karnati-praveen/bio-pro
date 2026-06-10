@@ -172,6 +172,31 @@ export default function CircuitEditor({ tabId, tab }) {
   // Reflect freshly compiled findings as squiggles.
   useEffect(() => { setMarkers(session?.findings); }, [session?.findings, setMarkers]);
 
+  // When a finding is clicked in ProblemsPanel, switch to the circuit tab and
+  // reveal the target token in the Monaco editor if it appears in the DSL.
+  useEffect(() => {
+    const ft = session?.focusTarget;
+    if (!ft?.nodeId || !ft?.ts) return;
+
+    // Switch to circuit diagram so the glow is visible.
+    setOutputTab("circuit");
+
+    // Reveal the target token in Monaco.
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (editor && monaco) {
+      const model = editor.getModel();
+      if (model) {
+        const matches = model.findMatches(ft.nodeId, false, false, true, null, false);
+        if (matches.length > 0) {
+          const { startLineNumber, startColumn } = matches[0].range;
+          editor.revealPositionInCenter({ lineNumber: startLineNumber, column: startColumn });
+          editor.setPosition({ lineNumber: startLineNumber, column: startColumn });
+        }
+      }
+    }
+  }, [session?.focusTarget?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Compile with ambiguous-goal detection.
   const handleCompile = useCallback(async () => {
     setStatus("Compiling…");
@@ -266,7 +291,12 @@ export default function CircuitEditor({ tabId, tab }) {
             <div className="output-content">
               {outputTab === "circuit" && (
                 <div className="output-card">
-                  <CircuitDiagram circuit={result?.circuit} />
+                  <CircuitDiagram
+                    circuit={result?.circuit}
+                    findings={session?.findings || []}
+                    focusNodeId={session?.focusTarget?.nodeId}
+                    focusTs={session?.focusTarget?.ts}
+                  />
                   <PartsLegend />
                 </div>
               )}

@@ -6,7 +6,6 @@ import {
   Legend,
   Line,
   LineChart,
-  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -19,13 +18,191 @@ import { doseResponse as fetchDoseResponse } from "../../shared/lib/api/client.j
 
 const FALLBACK_COLORS = ["#52b788", "#ffb703", "#cdb4db", "#e63946"];
 
-// Deterministic simulation chart
+// Classify a series by its biological role
+function seriesRole(s) {
+  if (s.is_reporter) return "Output reporter";
+  if (s.name.includes("(input)")) return "Input signal";
+  return "Regulator";
+}
+
+// Compute plain-English statistics from a deterministic simulation
+function computeStats(simulation) {
+  if (!simulation?.series?.length || !simulation.t?.length) return null;
+  const reporter = simulation.series.find(s => s.is_reporter) ?? simulation.series[0];
+  if (!reporter?.values?.length) return null;
+
+  const { values } = reporter;
+  const t = simulation.t;
+  const n = values.length;
+
+  // Steady-state: mean of last 10%
+  const ssSlice = values.slice(Math.max(0, Math.floor(n * 0.9)));
+  const steadyState = ssSlice.reduce((a, b) => a + b, 0) / ssSlice.length;
+
+  // Basal: mean of first 5%
+  const basalSlice = values.slice(0, Math.max(2, Math.floor(n * 0.05)));
+  const basal = basalSlice.reduce((a, b) => a + b, 0) / basalSlice.length;
+
+  const foldChange = basal > 1e-6 ? steadyState / basal : null;
+
+  // Response time: time to reach 90% of full excursion (only when clearly induced/repressed)
+  let responseTime = null;
+  if (foldChange !== null && (foldChange > 1.5 || foldChange < 0.67)) {
+    const target = basal + 0.9 * (steadyState - basal);
+    const idx =
+      steadyState > basal
+        ? values.findIndex(v => v >= target)
+        : values.findIndex(v => v <= target);
+    if (idx >= 0) responseTime = t[idx];
+  }
+
+  // Oscillation: find significant local maxima after the initial transient
+  const peakStart = Math.floor(n * 0.15);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const peakThreshold = minVal + 0.6 * (maxVal - minVal); // top 40% of range
+  // >= on left so flat-top peaks (consecutive equal values) are included;
+  // > on right ensures only the trailing edge of a flat top is counted once.
+  const peaks = [];
+  for (let i = peakStart + 1; i < n - 1; i++) {
+    if (
+      values[i] >= values[i - 1] &&
+      values[i] > values[i + 1] &&
+      values[i] >= peakThreshold
+    ) {
+      peaks.push(t[i]);
+    }
+  }
+  let oscillation = null;
+  if (peaks.length >= 2) {
+    const periods = peaks.slice(1).map((p, i) => p - peaks[i]);
+    const avg = periods.reduce((a, b) => a + b, 0) / periods.length;
+    const cv =
+      avg > 0
+        ? Math.sqrt(periods.reduce((a, b) => a + (b - avg) ** 2, 0) / periods.length) / avg
+        : 1;
+    if (cv < 0.3) oscillation = { period: avg, nCycles: peaks.length };
+  }
+
+  return { name: reporter.name, steadyState, basal, foldChange, responseTime, oscillation };
+}
+
+// Plain-English interpretation card
+function SimSummary({ simulation }) {
+  const s = computeStats(simulation);
+  if (!s) return null;
+  const { name, steadyState, basal, foldChange, responseTime, oscillation } = s;
+
+  return (
+    <div className="sim-summary">
+      <span className="sim-summary-heading">What this simulation shows</span>
+      {oscillation ? (
+        <>
+          <p>
+            <strong>Oscillating circuit</strong> — {name} cycles with an approximate period of{" "}
+            <strong>{oscillation.period.toFixed(1)} time units</strong>{" "}
+            ({oscillation.nCycles} peak{oscillation.nCycles !== 1 ? "s" : ""} detected).
+            Useful for generating rhythmic biological signals or timing pulses.
+          </p>
+          <p>
+            <strong>Mean output level:</strong> ~{steadyState.toFixed(2)} a.u.
+          </p>
+        </>
+      ) : foldChange !== null && foldChange > 1.5 ? (
+        <>
+          <p>
+            <strong>{foldChange.toFixed(1)}× fold-induction</strong> — {name} rises from a basal
+            level of <strong>{basal.toFixed(2)}</strong> to{" "}
+            <strong>{steadyState.toFixed(2)} a.u.</strong> when the inducer is applied.
+          </p>
+          {responseTime !== null && (
+            <p>
+              <strong>Response time:</strong> 90% of the final output is reached at{" "}
+              t&nbsp;≈&nbsp;<strong>{responseTime.toFixed(1)} a.u.</strong>
+            </p>
+          )}
+        </>
+      ) : foldChange !== null && foldChange < 0.67 ? (
+        <>
+          <p>
+            <strong>{(1 / foldChange).toFixed(1)}× repression</strong> — {name} drops from{" "}
+            <strong>{basal.toFixed(2)}</strong> (uninduced) to{" "}
+            <strong>{steadyState.toFixed(2)} a.u.</strong> when the repressor is active.
+          </p>
+          {responseTime !== null && (
+            <p>
+              <strong>Response time:</strong> reaches 90% of the repressed level at{" "}
+              t&nbsp;≈&nbsp;<strong>{responseTime.toFixed(1)} a.u.</strong>
+            </p>
+          )}
+        </>
+      ) : (
+        <p>
+          <strong>Constitutive expression</strong> — {name} maintains a steady level of{" "}
+          <strong>{steadyState.toFixed(2)} a.u.</strong> with no external trigger required.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Deterministic simulation chart with role-aware legend and formatted hover
 function DeterministicChart({ simulation }) {
   const data = simulation.t.map((t, i) => {
     const row = { t: Number(t.toFixed(1)) };
     simulation.series.forEach(s => { row[s.name] = s.values[i]; });
     return row;
   });
+
+  // name → role label lookup (closed over by tooltip and legend renderers)
+  const roleOf = {};
+  simulation.series.forEach(s => { roleOf[s.name] = seriesRole(s); });
+
+  const colorOf = {};
+  simulation.series.forEach((s, i) => {
+    colorOf[s.name] = s.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length];
+  });
+
+  const renderTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="sim-tooltip-box">
+        <div className="sim-tooltip-time">t = {label}</div>
+        {payload.map((entry, i) => (
+          <div key={i} className="sim-tooltip-row">
+            <span className="sim-tooltip-swatch" style={{ background: entry.color }} />
+            <span className="sim-tooltip-name">{entry.dataKey}</span>
+            <span className="sim-tooltip-role">{roleOf[entry.dataKey]}</span>
+            <span className="sim-tooltip-value">{Number(entry.value).toFixed(3)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderLegend = ({ payload }) => (
+    <div className="sim-series-legend">
+      {(payload || []).map((entry, i) => {
+        const isInput = simulation.series.find(s => s.name === entry.value)?.name.includes("(input)");
+        return (
+          <div key={i} className="sim-legend-entry">
+            <svg width="18" height="6" className="sim-legend-line">
+              <line
+                x1="0" y1="3" x2="18" y2="3"
+                stroke={entry.color}
+                strokeWidth="2.5"
+                strokeDasharray={isInput ? "4 3" : undefined}
+              />
+            </svg>
+            <span className="sim-legend-name">{entry.value}</span>
+            {roleOf[entry.value] && (
+              <span className="sim-legend-role">{roleOf[entry.value]}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -45,16 +222,16 @@ function DeterministicChart({ simulation }) {
           }}
           tick={{ fontSize: 11 }}
         />
-        <Tooltip />
-        <Legend />
+        <Tooltip content={renderTooltip} />
+        <Legend content={renderLegend} />
         {simulation.series.map((s, i) => (
           <Line
             key={s.name}
             type="monotone"
             dataKey={s.name}
-            stroke={s.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length]}
+            stroke={colorOf[s.name]}
             strokeWidth={s.is_reporter ? 3 : 1.5}
-            strokeDasharray={s.name.includes("input") ? "5 4" : undefined}
+            strokeDasharray={s.name.includes("(input)") ? "5 4" : undefined}
             dot={false}
           />
         ))}
@@ -72,13 +249,11 @@ export function StochasticChart({ stochastic, threshold }) {
 
   const color = reporter.color || "#52b788";
 
-  // Build data rows with mean, p10, p90
   const data = stochastic.t.map((t, i) => ({
     t: Number(t.toFixed(1)),
     mean: reporter.mean[i],
     p10: reporter.p10[i],
     p90: reporter.p90[i],
-    band: [reporter.p10[i], reporter.p90[i]],
   }));
 
   return (
@@ -104,8 +279,6 @@ export function StochasticChart({ stochastic, threshold }) {
             formatter={(value, name) => [value?.toFixed ? value.toFixed(2) : value, name]}
           />
           <Legend />
-
-          {/* Shaded band: render p90 as filled area above p10 */}
           <Line
             type="monotone"
             dataKey="p90"
@@ -124,7 +297,6 @@ export function StochasticChart({ stochastic, threshold }) {
             dot={false}
             name="10th percentile"
           />
-          {/* Mean trajectory (solid, thick) */}
           <Line
             type="monotone"
             dataKey="mean"
@@ -235,8 +407,7 @@ function StochasticInlineChart({ stochastic }) {
   );
 }
 
-// Dose-response chart: steady-state output vs inducer concentration (log x-axis).
-// Band-pass shows a peak; inducible shows a sigmoid; repressible an inverse sigmoid.
+// Dose-response chart: steady-state output vs inducer concentration (log x-axis)
 function DoseResponseChart({ dr, loading }) {
   if (loading) return <div className="panel-empty">Computing dose-response…</div>;
   if (!dr) return <div className="panel-empty">Click "Run dose-response ▶" to compute.</div>;
@@ -252,8 +423,14 @@ function DoseResponseChart({ dr, loading }) {
           scale="log"
           domain={["auto", "auto"]}
           type="number"
-          tickFormatter={(v) => v < 0.01 ? v.toExponential(0) : Number(v.toPrecision(2)).toString()}
-          label={{ value: `[${dr.inducer}] (a.u., log scale)`, position: "insideBottom", offset: -18 }}
+          tickFormatter={(v) =>
+            v < 0.01 ? v.toExponential(0) : Number(v.toPrecision(2)).toString()
+          }
+          label={{
+            value: `[${dr.inducer}] (a.u., log scale)`,
+            position: "insideBottom",
+            offset: -18,
+          }}
           tick={{ fontSize: 11 }}
         />
         <YAxis
@@ -382,6 +559,8 @@ export default function SimulationPlot({ simulation, stochastic, onRunStochastic
           <StochasticChart stochastic={stochastic} threshold={thresholdNum} />
         )}
       </div>
+
+      {mode === "deterministic" && <SimSummary simulation={simulation} />}
 
       {storeStochastic && (
         <div className="stoch-inline-section">

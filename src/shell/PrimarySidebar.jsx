@@ -7,14 +7,16 @@ import SourceControlView from "../modules/git/SourceControlView.jsx";
 import SimulationView from "../modules/simulation/SimulationView.jsx";
 import SettingsView from "../modules/settings/SettingsView.jsx";
 import ExtensionView from "../shared/ui/ExtensionView.jsx";
+import TemplateGallery from "../modules/templates/TemplateGallery.jsx";
 
 const VIEWS = {
-  explorer: { title: "Explorer",       Comp: ExplorerView,      actions: [VscNewFile, VscNewFolder, VscRefresh] },
-  parts:    { title: "Parts Library",  Comp: PartsLibraryView,  actions: [VscRefresh] },
-  search:   { title: "Search",         Comp: SearchView,        actions: [] },
-  git:      { title: "Source Control", Comp: SourceControlView, actions: [VscRefresh] },
-  sim:      { title: "Simulation",     Comp: SimulationView,    actions: [] },
-  settings: { title: "Settings",       Comp: SettingsView,      actions: [] },
+  explorer:  { title: "Explorer",         Comp: ExplorerView,      actions: [VscNewFile, VscNewFolder, VscRefresh] },
+  parts:     { title: "Parts Library",    Comp: PartsLibraryView,  actions: [VscRefresh] },
+  templates: { title: "Templates",        Comp: TemplateGallery,   actions: [] },
+  search:    { title: "Search",           Comp: SearchView,        actions: [] },
+  git:       { title: "Source Control",   Comp: SourceControlView, actions: [VscRefresh] },
+  sim:       { title: "Simulation",       Comp: SimulationView,    actions: [] },
+  settings:  { title: "Settings",         Comp: SettingsView,      actions: [] },
 };
 
 export default function PrimarySidebar() {
