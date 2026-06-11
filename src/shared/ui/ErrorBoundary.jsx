@@ -28,27 +28,27 @@ export default class ErrorBoundary extends Component {
         gap: 12,
         padding: 20,
         margin: 12,
-        background: "var(--bg-surface, #1e1e1e)",
-        border: "1.5px solid #c0392b",
+        background: "var(--surface)",
+        border: "1.5px solid var(--error)",
         borderRadius: 6,
-        fontFamily: "var(--font-ui, sans-serif)",
-        color: "var(--text-normal, #ccc)",
+        fontFamily: "var(--font-ui)",
+        color: "var(--text)",
       }}>
-        <div style={{ fontWeight: 600, color: "#e74c3c", fontSize: "var(--text-sm, 13px)" }}>
+        <div style={{ fontWeight: 600, color: "var(--error)", fontSize: "var(--text-sm)" }}>
           Panel crashed
         </div>
         <pre style={{
           margin: 0,
           padding: "10px 12px",
-          background: "var(--bg-base, #141414)",
-          border: "1px solid var(--border-subtle, #333)",
+          background: "var(--bg)",
+          border: "1px solid var(--border)",
           borderRadius: 4,
           fontSize: 12,
           lineHeight: 1.6,
           overflowX: "auto",
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
-          color: "#e57373",
+          color: "var(--error)",
         }}>
           {error.toString()}
           {error.stack ? `\n\n${error.stack}` : ""}
@@ -58,12 +58,12 @@ export default class ErrorBoundary extends Component {
             onClick={() => this.setState({ error: null })}
             style={{
               padding: "5px 14px",
-              background: "var(--accent, #3d9970)",
-              color: "#fff",
+              background: "var(--accent)",
+              color: "var(--on-accent)",
               border: "none",
               borderRadius: 4,
               cursor: "pointer",
-              fontSize: "var(--text-sm, 13px)",
+              fontSize: "var(--text-sm)",
             }}
           >
             Reload panel
@@ -72,12 +72,12 @@ export default class ErrorBoundary extends Component {
             onClick={this.handleCopy}
             style={{
               padding: "5px 14px",
-              background: "var(--bg-elevated, #2a2a2a)",
-              color: "var(--text-normal, #ccc)",
-              border: "1px solid var(--border-subtle, #444)",
+              background: "var(--surface-2)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
               borderRadius: 4,
               cursor: "pointer",
-              fontSize: "var(--text-sm, 13px)",
+              fontSize: "var(--text-sm)",
             }}
           >
             Copy error

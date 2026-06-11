@@ -19,6 +19,17 @@ const TYPE_LABEL = {
 
 function BaseNode({ data, shape }) {
   const isReporter = data.reporter || data.type === "reporter";
+  const nodeFindings = data.findings || [];
+  const hasError = nodeFindings.some((f) => f.severity === "error");
+  const hasWarning = !hasError && nodeFindings.some((f) => f.severity === "warning");
+  const showBadge = hasError || hasWarning;
+  const badgeTooltip = nodeFindings
+    .map((f) =>
+      `[${f.severity.toUpperCase()}] ${f.message}` +
+      (f.fix_suggestion ? `\n💡 ${f.fix_suggestion}` : "")
+    )
+    .join("\n\n");
+
   return (
     <div
       className={`part-node part-${data.type}`}
@@ -36,6 +47,14 @@ function BaseNode({ data, shape }) {
           {data.reporter && data.type !== "reporter" ? " · reporter" : ""}
         </div>
       </div>
+      {showBadge && (
+        <div
+          className={`node-problem-badge${hasError ? " badge-error" : " badge-warning"}`}
+          title={badgeTooltip}
+        >
+          {hasError ? "✖" : "⚠"}
+        </div>
+      )}
       <Handle type="source" position={Position.Right} />
     </div>
   );

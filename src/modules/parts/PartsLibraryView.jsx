@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FixedSizeList } from "react-window";
+import { List } from "react-window";
 import { usePartsStore } from "../../shared/stores/partsStore.js";
 import { useUiStore } from "../../shared/stores/uiStore.js";
+import { Button, Input, Select, Textarea, EmptyState, Callout } from "../../shared/ui/primitives/index.js";
 
 const TYPES = ["promoter", "cds", "rbs", "terminator", "inducer", "operator"];
 const HOSTS = ["ecoli", "yeast", "mammalian"];
-const REACT_COLOR = { self: "#2a9d8f", weak: "#f0883e", none: "#e9eef2" };
+const REACT_COLOR = { self: "var(--accent)", weak: "var(--modified)", none: "var(--surface-2)" };
 
 // Module 3 — searchable/filterable parts browser with custom-part creation,
 // GenBank import, and a cross-reactivity compatibility grid.
@@ -81,35 +82,35 @@ export default function PartsLibraryView() {
 
   return (
     <div className="parts-library" style={{ height: "100%", overflow: "hidden" }}>
-      <input className="parts-search" placeholder="Search parts…"
+      <Input className="parts-search" placeholder="Search parts…"
         value={filters.query} onChange={(e) => setFilter("query", e.target.value)} />
       <div className="parts-filters">
-        <select value={filters.type} onChange={(e) => setFilter("type", e.target.value)}>
+        <Select value={filters.type} onChange={(e) => setFilter("type", e.target.value)}>
           <option value="">All types</option>
           {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select value={filters.host} onChange={(e) => setFilter("host", e.target.value)}>
+        </Select>
+        <Select value={filters.host} onChange={(e) => setFilter("host", e.target.value)}>
           <option value="">All hosts</option>
           {HOSTS.map((h) => <option key={h} value={h}>{h}</option>)}
-        </select>
+        </Select>
       </div>
 
       <div className="parts-actions">
-        <button className="btn" onClick={() => setShowForm((v) => !v)}>+ Custom</button>
-        <button className="btn" onClick={() => fileRef.current?.click()}>Import GenBank</button>
-        <button className="btn" onClick={() => setShowCross((v) => !v)}>Compatibility</button>
+        <Button size="sm" onClick={() => setShowForm((v) => !v)}>+ Custom</Button>
+        <Button size="sm" onClick={() => fileRef.current?.click()}>Import GenBank</Button>
+        <Button size="sm" onClick={() => setShowCross((v) => !v)}>Compatibility</Button>
         <input ref={fileRef} type="file" accept=".gb,.gbk,.fasta,.fa" hidden onChange={onImport} />
       </div>
 
       {showForm && (
         <form className="custom-part-form" onSubmit={submitForm}>
-          <input placeholder="id (e.g. pMyProm)" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} required />
-          <input placeholder="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+          <Input placeholder="id (e.g. pMyProm)" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} required />
+          <Input placeholder="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <textarea placeholder="sequence (ATGC…)" rows={2} value={form.seq} onChange={(e) => setForm({ ...form, seq: e.target.value })} />
-          <button className="btn primary" type="submit">Save part</button>
+          </Select>
+          <Textarea placeholder="sequence (ATGC…)" rows={2} value={form.seq} onChange={(e) => setForm({ ...form, seq: e.target.value })} />
+          <Button variant="primary" size="sm" type="submit">Save part</Button>
         </form>
       )}
 
@@ -138,22 +139,19 @@ export default function PartsLibraryView() {
         </div>
       )}
 
-      {loading && <div className="panel-empty">Loading parts…</div>}
-      {error && <div className="explorer-error">{error}</div>}
+      {loading && <EmptyState title="Loading parts…" />}
+      {error && <Callout tone="error">{error}</Callout>}
 
       <div ref={listContainerRef} style={{ flex: 1, minHeight: 0 }}>
         {parts && results.length === 0
-          ? <div className="explorer-empty">No matching parts</div>
+          ? <EmptyState title="No matching parts" />
           : (
-            <FixedSizeList
-              height={listHeight}
-              itemCount={results.length}
-              itemSize={58}
-              width="100%"
-              style={{ listStyle: "none", margin: 0, padding: 0 }}
-            >
-              {Row}
-            </FixedSizeList>
+            <List
+              rowCount={results.length}
+              rowHeight={58}
+              rowComponent={Row}
+              style={{ height: listHeight, width: "100%", listStyle: "none", margin: 0, padding: 0 }}
+            />
           )
         }
       </div>

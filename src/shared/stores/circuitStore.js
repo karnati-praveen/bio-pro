@@ -21,6 +21,7 @@ function blank() {
     error: null,
     history: [],         // past dsl snapshots
     future: [],          // redo stack
+    focusTarget: null,   // { nodeId, ts } — set by ProblemsPanel click to pan/glow a node
   };
 }
 
@@ -53,6 +54,9 @@ export const useCircuitStore = create((set, get) => ({
   setOrganism: (tabId, organism) => get()._patch(tabId, { organism }),
 
   applyFindings: (tabId, findings) => get()._patch(tabId, { findings: findings || [] }),
+
+  setFocusTarget: (tabId, nodeId) =>
+    get()._patch(tabId, { focusTarget: { nodeId, ts: Date.now() } }),
 
   compile: async (tabId, payload) => {
     const cur = get().byTab[tabId] ?? blank();

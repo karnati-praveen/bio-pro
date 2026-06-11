@@ -8,6 +8,7 @@ import { useTabStore } from "../../shared/stores/tabStore.js";
 import { useUiStore } from "../../shared/stores/uiStore.js";
 import { useLlmStore, PROVIDERS } from "../../shared/stores/llmStore.js";
 import { runCommand } from "../../shell/commands.js";
+import { Button, Tabs, TabList, Tab, Select, Callout } from "../../shared/ui/primitives/index.js";
 
 import CircuitDiagram from "./CircuitDiagram.jsx";
 import SimulationPlot from "../simulation/SimulationPlot.jsx";
@@ -172,6 +173,31 @@ export default function CircuitEditor({ tabId, tab }) {
   // Reflect freshly compiled findings as squiggles.
   useEffect(() => { setMarkers(session?.findings); }, [session?.findings, setMarkers]);
 
+  // When a finding is clicked in ProblemsPanel, switch to the circuit tab and
+  // reveal the target token in the Monaco editor if it appears in the DSL.
+  useEffect(() => {
+    const ft = session?.focusTarget;
+    if (!ft?.nodeId || !ft?.ts) return;
+
+    // Switch to circuit diagram so the glow is visible.
+    setOutputTab("circuit");
+
+    // Reveal the target token in Monaco.
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (editor && monaco) {
+      const model = editor.getModel();
+      if (model) {
+        const matches = model.findMatches(ft.nodeId, false, false, true, null, false);
+        if (matches.length > 0) {
+          const { startLineNumber, startColumn } = matches[0].range;
+          editor.revealPositionInCenter({ lineNumber: startLineNumber, column: startColumn });
+          editor.setPosition({ lineNumber: startLineNumber, column: startColumn });
+        }
+      }
+    }
+  }, [session?.focusTarget?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Compile with ambiguous-goal detection.
   const handleCompile = useCallback(async () => {
     setStatus("Compiling…");
@@ -208,14 +234,13 @@ export default function CircuitEditor({ tabId, tab }) {
         <Allotment.Pane minSize={260} preferredSize={380}>
           <div className="dsl-pane">
             <div className="dsl-toolbar">
-              <select value={organism} onChange={(e) => setOrganism(tabId, e.target.value)}>
+              <Select value={organism} onChange={(e) => setOrganism(tabId, e.target.value)} style={{ flex: 1 }}>
                 {ORGANISMS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              </Select>
               <ProviderBadge onClick={() => useUiStore.getState().setActivity("settings")} />
-              <button className="btn primary" disabled={session?.loading}
-                onClick={handleCompile}>
+              <Button variant="primary" size="sm" disabled={session?.loading} onClick={handleCompile}>
                 {session?.loading ? "Compiling…" : "Compile ▶"}
-              </button>
+              </Button>
             </div>
             <div className="dsl-editor">
               <Editor
@@ -236,37 +261,36 @@ export default function CircuitEditor({ tabId, tab }) {
               />
             </div>
             {session?.error && (
-              <div style={{
-                borderLeft: "3px solid #f55",
-                background: "rgba(255,60,60,0.08)",
-                color: "#f99",
-                fontFamily: '"Fira Mono","Consolas",monospace',
-                fontSize: "12px",
-                padding: "8px 12px",
-                margin: "6px 8px",
-                whiteSpace: "pre-wrap",
-              }}>{session.error}</div>
+              <Callout tone="error" style={{ margin: "6px 8px", fontFamily: '"Fira Mono","Consolas",monospace', whiteSpace: "pre-wrap" }}>
+                {session.error}
+              </Callout>
             )}
           </div>
         </Allotment.Pane>
 
         <Allotment.Pane minSize={320}>
           <div className="output-pane">
-            <div className="output-tab-bar">
-              {OUTPUT_TABS.map((t) => (
-                <button key={t.id} className={`output-tab${outputTab === t.id ? " active" : ""}`}
-                  onClick={() => setOutputTab(t.id)}>
-                  {t.label}
-                </button>
-              ))}
-              <span style={{ flex: 1 }} />
-              <button className="output-tab workbench-btn" title="Open the full Simulation Workbench"
-                onClick={openWorkbench}>📊 Workbench</button>
-            </div>
+            <Tabs value={outputTab} onChange={setOutputTab}>
+              <TabList>
+                {OUTPUT_TABS.map((t) => (
+                  <Tab key={t.id} value={t.id} accent="ft-circuit">{t.label}</Tab>
+                ))}
+                <span style={{ flex: 1 }} />
+                <Button variant="ghost" size="sm" title="Open the full Simulation Workbench"
+                  onClick={openWorkbench} style={{ alignSelf: "center", margin: "0 var(--space-2)" }}>
+                  📊 Workbench
+                </Button>
+              </TabList>
+            </Tabs>
             <div className="output-content">
               {outputTab === "circuit" && (
                 <div className="output-card">
-                  <CircuitDiagram circuit={result?.circuit} />
+                  <CircuitDiagram
+                    circuit={result?.circuit}
+                    findings={session?.findings || []}
+                    focusNodeId={session?.focusTarget?.nodeId}
+                    focusTs={session?.focusTarget?.ts}
+                  />
                   <PartsLegend />
                 </div>
               )}

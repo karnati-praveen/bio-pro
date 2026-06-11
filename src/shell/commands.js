@@ -146,6 +146,9 @@ export const COMMANDS = [
   { id: "help.welcome", title: "Show Welcome Screen", category: "Help",
     description: "Open the welcome tab with examples and quick-start actions",
     run: () => tabs().openTab({ type: "welcome", title: "Welcome", icon: "🏠" }) },
+  { id: "help.templates", title: "Template Gallery", category: "Help", keybinding: "Ctrl+Shift+T",
+    description: "Browse curated circuit, chemistry, and workflow templates — click any card to open pre-filled",
+    run: () => tabs().openTab({ type: "templates", title: "Template Gallery", icon: "📚" }) },
   { id: "help.shortcuts", title: "Keyboard Shortcuts Reference", category: "Help", keybinding: "Ctrl+Shift+?",
     description: "Show all keyboard shortcuts grouped by category",
     run: () => ui().openModal("keyboard-shortcuts") },
@@ -193,6 +196,9 @@ export const COMMANDS = [
   { id: "chem.newSpectrum", title: "New Spectrum", category: "Chemistry",
     description: "Visualize a JCAMP-DX spectrum file",
     run: () => tabs().openTab({ type: "spectrum", title: "spectrum.jdx" }) },
+  { id: "chem.titration", title: "Acid–Base Titration", category: "Chemistry",
+    description: "Plot a titration curve with equivalence point, half-equivalence (pH=pKa), and buffer-region shading",
+    run: () => tabs().openTab({ type: "titration", title: "Titration", icon: "⚗️" }) },
 
   // ── Workflow (Phase 5) ────────────────────────────────────────────────
   { id: "wf.newPathway", title: "New Pathway (FBA)", category: "Workflow",
@@ -210,6 +216,9 @@ export const COMMANDS = [
   { id: "biology.codonOptimize", title: "Codon Optimizer", category: "Biology",
     description: "Back-translate or recode a CDS / protein for E. coli, yeast, or human expression; reports CAI before/after",
     run: () => tabs().openTab({ type: "codon", title: "Codon Optimizer" }) },
+  { id: "biology.align", title: "Sequence Alignment", category: "Biology",
+    description: "Global (Needleman-Wunsch), local (Smith-Waterman), or center-star MSA for up to 20 sequences; colored residue grid, conservation, and identity matrix",
+    run: () => tabs().openTab({ type: "alignment", title: "Sequence Alignment" }) },
   {
     id: "wf.generateProtocol", title: "Generate Protocol", category: "Workflow",
     run: () => {
@@ -218,6 +227,19 @@ export const COMMANDS = [
       if (!c?.result) { ui().setStatus("Compile a circuit first (Ctrl+Enter)."); return; }
       tabs().openTab({ type: "protocol", title: `Protocol: ${c.result.spec?.output || t.title}`,
         meta: { result: c.result } });
+    },
+  },
+  {
+    id: "experiment.simulateAssay",
+    title: "Simulate Assay Readout",
+    category: "Experiment",
+    description: "Predict flow cytometry, plate reader, qPCR, and gel readouts for the compiled circuit",
+    run: () => {
+      const t = activeCircuitTab();
+      const c = t && circuits().get(t.id);
+      const meta = c?.result ? { result: c.result } : {};
+      const label = c?.result?.spec?.output ? `Assay: ${c.result.spec.output}` : "Assay Simulator";
+      tabs().openTab({ type: "assay", title: label, meta });
     },
   },
 
@@ -247,6 +269,9 @@ export const COMMANDS = [
   { id: "go.search", title: "Show Search", category: "Go", run: () => ui().setActivity("search") },
   { id: "go.git", title: "Show Source Control", category: "Go", run: () => ui().setActivity("git") },
   { id: "go.sim", title: "Show Simulation", category: "Go", run: () => ui().setActivity("sim") },
+  { id: "go.templates", title: "Show Template Gallery", category: "Go",
+    description: "Open the template gallery sidebar panel",
+    run: () => ui().setActivity("templates") },
   { id: "go.settings", title: "Open Settings", category: "Go", run: () => ui().setActivity("settings") },
 
   // ── Circuit / simulation ────────────────────────────────────────────────

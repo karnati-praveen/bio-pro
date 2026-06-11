@@ -2,9 +2,11 @@ import { useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { chemReaction, chemKinetics } from "../../shared/lib/api/client.js";
+import {
+  chemReaction, chemKinetics, chemBalance, chemStoichiometry,
+} from "../../shared/lib/api/client.js";
 
-const COLORS = ["#2a9d8f", "#e63946", "#4895ef", "#f0883e", "#9d4edd", "#457b9d"];
+const COLORS = ["var(--accent)", "var(--error)", "var(--feat-promoter)", "var(--modified)", "var(--feat-operator)", "var(--link)"];
 
 // Module 6 — Reaction Designer. Enter reactant/product/reagent SMILES → reaction
 // SMILES; define a mass-action network → kinetics ODE plotted with Recharts.
@@ -19,7 +21,37 @@ export default function ReactionEditor() {
   const [sim, setSim] = useState(null);
   const [err, setErr] = useState(null);
 
+  // Balance & stoichiometry (formula-based, not SMILES).
+  const [bReactants, setBReactants] = useState("C3H8, O2");
+  const [bProducts, setBProducts] = useState("CO2, H2O");
+  const [amounts, setAmounts] = useState("C3H8=44 g, O2=160 g");
+  const [actual, setActual] = useState("");
+  const [balanced, setBalanced] = useState(null);
+  const [stoich, setStoich] = useState(null);
+  const [chemErr, setChemErr] = useState(null);
+
   const split = (s) => s.split(",").map((x) => x.trim()).filter(Boolean);
+
+  const doBalance = async () => {
+    setChemErr(null); setStoich(null);
+    try {
+      setBalanced(await chemBalance(split(bReactants), split(bProducts)));
+    } catch (e) { setChemErr(e.message); setBalanced(null); }
+  };
+
+  const doStoich = async () => {
+    setChemErr(null);
+    try {
+      const amt = parseAmounts(amounts);
+      const act = parseAmounts(actual);
+      const res = await chemStoichiometry(
+        split(bReactants), split(bProducts), amt,
+        Object.keys(act).length ? act : null,
+      );
+      setBalanced(res.balanced);
+      setStoich(res);
+    } catch (e) { setChemErr(e.message); }
+  };
 
   const buildReaction = async () => {
     const r = await chemReaction(split(reactants), split(products), split(reagents));
@@ -80,9 +112,85 @@ export default function ReactionEditor() {
           </div>
         )}
       </section>
+
+      <section className="rxn-section">
+        <h3>Balance &amp; Stoichiometry</h3>
+        <label className="rxn-row">Reactants (formulas)<input value={bReactants} onChange={(e) => setBReactants(e.target.value)} /></label>
+        <label className="rxn-row">Products (formulas)<input value={bProducts} onChange={(e) => setBProducts(e.target.value)} /></label>
+        <label className="rxn-row">Amounts (<code>formula=value g|mg|mol|mmol</code>)
+          <input value={amounts} onChange={(e) => setAmounts(e.target.value)} />
+        </label>
+        <label className="rxn-row">Actual yield (optional, same format)
+          <input value={actual} onChange={(e) => setActual(e.target.value)} />
+        </label>
+        <div className="rxn-btns">
+          <button className="btn" onClick={doBalance}>Balance</button>
+          <button className="btn primary" onClick={doStoich}>Stoichiometry →</button>
+        </div>
+        {chemErr && <div className="dsl-error">{chemErr}</div>}
+        {balanced && <code className="rxn-out">{balanced.equation}</code>}
+        {stoich && (
+          <div className="stoich-tables">
+            <table className="stoich-table">
+              <thead>
+                <tr><th>Reagent</th><th>Coeff</th><th>Mol</th><th>Grams</th><th>Consumed (mol)</th><th>Excess (mol)</th></tr>
+              </thead>
+              <tbody>
+                {stoich.reagents.map((r) => (
+                  <tr key={r.formula} className={r.limiting ? "limiting" : ""}>
+                    <td>{r.formula}{r.limiting && <span className="tag">limiting</span>}</td>
+                    <td>{r.coeff}</td>
+                    <td>{fmt(r.moles)}</td>
+                    <td>{fmt(r.grams)}</td>
+                    <td>{fmt(r.consumed_moles)}</td>
+                    <td>{fmt(r.excess_moles)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <table className="stoich-table">
+              <thead>
+                <tr><th>Product</th><th>Coeff</th><th>Theo. mol</th><th>Theo. g</th><th>% yield</th></tr>
+              </thead>
+              <tbody>
+                {stoich.products.map((p) => (
+                  <tr key={p.formula}>
+                    <td>{p.formula}</td>
+                    <td>{p.coeff}</td>
+                    <td>{fmt(p.theoretical_moles)}</td>
+                    <td>{fmt(p.theoretical_grams)}</td>
+                    <td>{p.percent_yield != null ? `${p.percent_yield}%` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
+
+// Parse "C3H8=44 g, O2=160 mol" → { C3H8: {grams:44}, O2: {moles:160} }.
+function parseAmounts(s) {
+  const out = {};
+  for (const tok of (s || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+    const [formula, rest] = tok.split("=").map((x) => x.trim());
+    if (!formula || !rest) continue;
+    const m = rest.match(/^([\d.]+)\s*(mmol|mol|mg|g)?$/i);
+    if (!m) continue;
+    const val = Number(m[1]);
+    const unit = (m[2] || "g").toLowerCase();
+    if (unit === "mmol") out[formula] = { moles: val / 1000 };
+    else if (unit === "mol") out[formula] = { moles: val };
+    else if (unit === "mg") out[formula] = { grams: val / 1000 };
+    else out[formula] = { grams: val };
+  }
+  return out;
+}
+
+const fmt = (v) =>
+  v == null ? "—" : Number(v).toLocaleString(undefined, { maximumFractionDigits: 4 });
 
 // Parse "A + B -> C @ 0.5" (or "S -> P @ mm vmax=1 km=0.5").
 function parseReaction(line) {

@@ -14,7 +14,7 @@ const ENZYME_DESCRIPTIONS = {
 const CUT_IN_GUIDE = { SpCas9: 17, SaCas9: 18, Cas12a: 18 };
 
 function ScoreBar({ score }) {
-  const color = score >= 70 ? "#2a9d8f" : score >= 40 ? "#e9c46a" : "#e63946";
+  const color = score >= 70 ? "var(--accent)" : score >= 40 ? "var(--badge-warn-fg)" : "var(--error)";
   return (
     <div className="crispr-score-bar">
       <div className="crispr-score-fill" style={{ width: `${score}%`, background: color }} />

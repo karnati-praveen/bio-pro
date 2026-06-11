@@ -59,6 +59,9 @@ from modules.git import api as git_router
 from modules.seqmap import api as seqmap_router
 from modules.crispr import api as crispr_router
 from modules.codon import api as codon_router
+from modules.align import api as align_router
+from modules.assays import api as assays_router
+from modules.projects import api as projects_router
 
 
 @asynccontextmanager
@@ -95,6 +98,9 @@ app.include_router(git_router.router)
 app.include_router(seqmap_router.router)
 app.include_router(codon_router.router)
 app.include_router(crispr_router.router)
+app.include_router(align_router.router)
+app.include_router(assays_router.router)
+app.include_router(projects_router.router)
 
 
 # --------------------------------------------------------------------------- #
@@ -365,6 +371,7 @@ class SaveDesignRequest(BaseModel):
     name: str
     request: dict
     response: dict
+    project_id: Optional[int] = None
 
 
 class AddVersionRequest(BaseModel):
@@ -377,7 +384,9 @@ def create_design(
     body: SaveDesignRequest, x_user_email: Optional[str] = Header(default=None)
 ) -> dict:
     return repo.create_design(
-        body.name, body.request, body.response, owner_email=x_user_email or ""
+        body.name, body.request, body.response,
+        owner_email=x_user_email or "",
+        project_id=body.project_id,
     )
 
 

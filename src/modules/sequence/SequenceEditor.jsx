@@ -6,11 +6,11 @@ import {
   seqParse, seqRevComp, seqTranslate, seqGC, seqOrfs, seqRestriction, designPrimers,
 } from "../../shared/lib/api/client.js";
 
-const BASE_COLOR = { A: "#3a86ff", C: "#ffbe0b", G: "#2a9d8f", T: "#e63946", U: "#e63946", N: "#9aa5b1" };
+const BASE_COLOR = { A: "var(--base-a)", C: "var(--base-c)", G: "var(--base-g)", T: "var(--base-t)", U: "var(--base-t)", N: "var(--base-n)" };
 const FEATURE_COLOR = {
-  promoter: "#4895ef", CDS: "#2a9d8f", cds: "#2a9d8f", gene: "#2a9d8f",
-  RBS: "#ffd166", rbs: "#ffd166", terminator: "#e63946", operator: "#9d4edd",
-  misc_feature: "#9aa5b1",
+  promoter: "var(--feat-promoter)", CDS: "var(--feat-cds)", cds: "var(--feat-cds)", gene: "var(--feat-cds)",
+  RBS: "var(--feat-rbs)", rbs: "var(--feat-rbs)", terminator: "var(--feat-terminator)", operator: "var(--feat-operator)",
+  misc_feature: "var(--feat-misc)",
 };
 const ROW = 60;
 
@@ -121,8 +121,8 @@ export default function SequenceEditor({ tab }) {
               <XAxis dataKey="pos" tick={{ fontSize: 10 }} />
               <YAxis domain={[0, 100]} width={28} tick={{ fontSize: 10 }} />
               <Tooltip formatter={(v) => `${v}%`} />
-              <ReferenceLine y={50} stroke="#ccc" strokeDasharray="3 3" />
-              <Line type="monotone" dataKey="gc" stroke="#2a9d8f" dot={false} strokeWidth={1.5} />
+              <ReferenceLine y={50} stroke="var(--border)" strokeDasharray="3 3" />
+              <Line type="monotone" dataKey="gc" stroke="var(--accent)" dot={false} strokeWidth={1.5} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -131,7 +131,7 @@ export default function SequenceEditor({ tab }) {
       {data.features.length > 0 && (
         <div className="seq-feature-legend">
           {data.features.map((f, i) => (
-            <span key={i} className="feature-chip" style={{ background: FEATURE_COLOR[f.type] || "#9aa5b1" }}>
+            <span key={i} className="feature-chip" style={{ background: FEATURE_COLOR[f.type] || "var(--feat-misc)" }}>
               {f.label} ({f.start + 1}–{f.end})
             </span>
           ))}
@@ -155,8 +155,8 @@ export default function SequenceEditor({ tab }) {
                   <span
                     key={j}
                     className={`seq-base${hasSite ? " has-site" : ""}`}
-                    style={{ color: feat ? "#fff" : BASE_COLOR[b] || "#000",
-                             background: feat ? (FEATURE_COLOR[feat.type] || "#9aa5b1") : "transparent" }}
+                    style={{ color: feat ? "var(--on-accent)" : BASE_COLOR[b] || "var(--text)",
+                             background: feat ? (FEATURE_COLOR[feat.type] || "var(--feat-misc)") : "transparent" }}
                     title={feat ? feat.label : hasSite ? hasSite.join(", ") : `pos ${idx + 1}`}
                   >
                     {b}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { chemProperties, chemSdf } from "../../shared/lib/api/client.js";
+import { useUiStore } from "../../shared/stores/uiStore.js";
 
 const STYLES_3D = ["stick", "sphere", "line", "cartoon"];
 
@@ -14,6 +15,8 @@ export default function MoleculeEditor({ tab }) {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState("2d");
   const [style3d, setStyle3d] = useState("stick");
+
+  const theme = useUiStore((s) => s.theme);
 
   const canvasRef = useRef(null);
   const viewer3dRef = useRef(null);
@@ -32,7 +35,7 @@ export default function MoleculeEditor({ tab }) {
 
   useEffect(() => { load(); /* initial */ }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Draw 2D whenever the SMILES changes and the 2D view is active.
+  // Draw 2D whenever the SMILES or theme changes and the 2D view is active.
   useEffect(() => {
     if (view !== "2d" || !props?.smiles || !canvasRef.current) return;
     let cancelled = false;
@@ -42,19 +45,20 @@ export default function MoleculeEditor({ tab }) {
         const SmilesDrawer = mod.default || mod;
         const drawer = new SmilesDrawer.Drawer({ width: 360, height: 280, bondThickness: 1.0 });
         SmilesDrawer.parse(props.smiles, (tree) => {
-          if (!cancelled && canvasRef.current) drawer.draw(tree, canvasRef.current, "light");
+          if (!cancelled && canvasRef.current) drawer.draw(tree, canvasRef.current, theme);
         }, () => { if (!cancelled) setError("Could not render this structure in 2D."); });
       } catch {
         setError("2D renderer unavailable.");
       }
     })();
     return () => { cancelled = true; };
-  }, [view, props?.smiles]);
+  }, [view, props?.smiles, theme]);
 
-  // Build the 3D viewer from a PubChem SDF when 3D view is active.
+  // Build the 3D viewer from a PubChem SDF when 3D view or theme changes.
   useEffect(() => {
     if (view !== "3d" || !props || !viewer3dRef.current) return;
     let cancelled = false;
+    const bg3d = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
     (async () => {
       const q = props.cid ? String(props.cid) : props.smiles;
       const t = props.cid ? "cid" : "smiles";
@@ -64,7 +68,7 @@ export default function MoleculeEditor({ tab }) {
         const $3Dmol = await import("3dmol");
         const el = viewer3dRef.current;
         el.innerHTML = "";
-        const viewer = $3Dmol.createViewer(el, { backgroundColor: "white" });
+        const viewer = $3Dmol.createViewer(el, { backgroundColor: bg3d });
         viewer.addModel(sdf, "sdf");
         applyStyle(viewer, style3d);
         viewer.zoomTo();
@@ -75,7 +79,7 @@ export default function MoleculeEditor({ tab }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [view, props]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view, props, theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Restyle the existing 3D model without refetching.
   useEffect(() => {

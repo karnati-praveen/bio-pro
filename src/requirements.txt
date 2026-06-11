@@ -3,6 +3,7 @@ uvicorn[standard]==0.34.0
 scipy==1.15.0
 numpy==2.2.1
 pydantic==2.10.4
+httpx>=0.27,<0.29  # PubChem REST client + Ollama provider (also a transitive dep of anthropic/fastapi)
 anthropic==0.69.0
 sqlalchemy==2.0.36
 biopython==1.85

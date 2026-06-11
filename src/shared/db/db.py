@@ -1,13 +1,14 @@
 """SQLAlchemy engine/session setup for the designs store.
 
 A single local SQLite file. ``DESIGNS_DB`` overrides the path (the test-suite points it
-at a temp file). ``init_db`` creates the schema on startup.
+at a temp file). ``init_db`` creates the schema on startup and runs lightweight column
+migrations so that existing databases gain new columns without data loss.
 """
 
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "designs.db"
@@ -26,11 +27,34 @@ class Base(DeclarativeBase):
 
 
 def init_db() -> None:
-    """Create tables and seed the parts library if empty (idempotent)."""
+    """Create tables, run column migrations, and seed the parts library (idempotent)."""
     from shared.db import models  # noqa: F401 -- register mappers before create_all
 
     Base.metadata.create_all(engine)
+    _migrate_columns()
     _seed_parts()
+
+
+def _migrate_columns() -> None:
+    """Add new columns to existing tables that pre-date the current schema.
+
+    SQLite's ALTER TABLE only supports adding nullable columns, which is exactly what
+    we need. We check PRAGMA table_info first so the migration is idempotent.
+    """
+    migrations: list[tuple[str, str, str]] = [
+        # (table, column, type)
+        ("designs",          "project_id",        "INTEGER"),
+        ("simulation_runs",  "project_id",        "INTEGER"),
+        ("experiments",      "project_id",        "INTEGER"),
+        ("experiments",      "design_version_no", "INTEGER"),
+    ]
+    with engine.connect() as conn:
+        for table, column, col_type in migrations:
+            rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+            existing = {row[1] for row in rows}
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+        conn.commit()
 
 
 def _seed_parts() -> None:

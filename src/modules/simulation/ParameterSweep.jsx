@@ -121,7 +121,7 @@ export default function ParameterSweep({ result }) {
           <div className="plot-wrap" style={{ height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 8, right: 24, bottom: 24, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f4" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis
                   dataKey="t"
                   label={{ value: "time (a.u.)", position: "insideBottom", offset: -10 }}

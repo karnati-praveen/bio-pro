@@ -8,6 +8,7 @@ import BottomPanel from "./BottomPanel.jsx";
 import StatusBar from "./StatusBar.jsx";
 import CommandPalette from "./CommandPalette.jsx";
 import KeyboardShortcutsPanel from "../shared/ui/KeyboardShortcutsPanel.jsx";
+import TopBar from "./TopBar.jsx";
 import { useGlobalKeybindings } from "./keybindings.js";
 import { useUiStore } from "../shared/stores/uiStore.js";
 
@@ -31,6 +32,7 @@ export default function Shell() {
 
   return (
     <div className="shell">
+      <TopBar />
       <div className="shell-body">
         <ActivityBar />
         <Allotment proportionalLayout={false}>

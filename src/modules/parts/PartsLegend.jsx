@@ -1,17 +1,17 @@
 // Static key mapping part types -> colors/glyphs used in the circuit diagram.
 const LEGEND = [
-  { type: "promoter", glyph: "→", label: "Promoter", color: "#8ecae6" },
-  { type: "cds", glyph: "▭", label: "Gene (CDS)", color: "#52b788" },
-  { type: "inducer", glyph: "◆", label: "Inducer", color: "#cdb4db" },
-  { type: "rbs", glyph: "○", label: "RBS", color: "#bde0fe" },
-  { type: "terminator", glyph: "⊤", label: "Terminator", color: "#c8c8c8" },
-  { type: "logic", glyph: "⋈", label: "Logic gate", color: "#6c757d" },
+  { type: "promoter", glyph: "→", label: "Promoter", color: "var(--feat-promoter)" },
+  { type: "cds", glyph: "▭", label: "Gene (CDS)", color: "var(--feat-cds)" },
+  { type: "inducer", glyph: "◆", label: "Inducer", color: "var(--parts-inducer)" },
+  { type: "rbs", glyph: "○", label: "RBS", color: "var(--info)" },
+  { type: "terminator", glyph: "⊤", label: "Terminator", color: "var(--text-muted)" },
+  { type: "logic", glyph: "⋈", label: "Logic gate", color: "var(--text-muted)" },
 ];
 
 const EDGES = [
-  { label: "expresses / activates (→)", color: "#2a9d8f" },
-  { label: "represses (⊣)", color: "#e76f51" },
-  { label: "inhibits inducer→repressor (⊣ dashed)", color: "#9d4edd" },
+  { label: "expresses / activates (→)", color: "var(--accent)" },
+  { label: "represses (⊣)", color: "var(--error)" },
+  { label: "inhibits inducer→repressor (⊣ dashed)", color: "var(--feat-operator)" },
 ];
 
 export default function PartsLegend() {

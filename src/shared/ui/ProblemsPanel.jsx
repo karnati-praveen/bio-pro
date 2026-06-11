@@ -2,6 +2,7 @@ import { VscError, VscWarning, VscInfo } from "react-icons/vsc";
 import { useTabStore } from "../stores/tabStore.js";
 import { useCircuitStore } from "../stores/circuitStore.js";
 import { useMarkersStore } from "../stores/markersStore.js";
+import EmptyState from "./primitives/EmptyState.jsx";
 
 const SEV_ICON = {
   error: <VscError className="sev-error" />,
@@ -20,6 +21,7 @@ export default function ProblemsPanel() {
   const activeTab = useTabStore((s) => s.activeTab());
   const byTab = useCircuitStore((s) => s.byTab);
   const byPath = useMarkersStore((s) => s.byPath);
+  const setFocusTarget = useCircuitStore((s) => s.setFocusTarget);
 
   // Bio-compiler findings from the active circuit tab.
   const compilerFindings = (activeTab && byTab[activeTab.id]?.findings) || [];
@@ -42,17 +44,27 @@ export default function ProblemsPanel() {
 
   const findings = [...compilerFindings, ...extensionFindings];
 
+  const handleClick = (f) => {
+    if (!f.target || !activeTab?.id) return;
+    setFocusTarget(activeTab.id, f.target);
+  };
+
   if (!activeTab) {
-    return <div className="panel-empty">Open a file to see problems.</div>;
+    return <EmptyState title="Open a file to see problems." />;
   }
   if (findings.length === 0) {
-    return <div className="panel-empty">No problems detected. ✓</div>;
+    return <EmptyState icon="✓" title="No problems detected." />;
   }
 
   return (
     <ul className="problems-list">
       {findings.map((f, i) => (
-        <li key={`${f.code}-${i}`} className="problem-item">
+        <li
+          key={`${f.code}-${i}`}
+          className={`problem-item${f.target ? " problem-item--locatable" : ""}`}
+          onClick={() => handleClick(f)}
+          title={f.target ? "Click to locate in diagram / editor" : undefined}
+        >
           <span className="problem-icon">{SEV_ICON[f.severity] ?? SEV_ICON.info}</span>
           <div className="problem-body">
             <div className="problem-message">{f.message}</div>
@@ -60,7 +72,9 @@ export default function ProblemsPanel() {
               {f.code}{f.target ? ` · ${f.target}` : ""}{f.source ? ` [${f.source}]` : ""}
             </div>
             {f.fix_suggestion && (
-              <div className="problem-fix" title="Suggested fix">💡 {f.fix_suggestion}</div>
+              <div className="problem-fix">
+                💡 <strong>Suggested fix:</strong> {f.fix_suggestion}
+              </div>
             )}
           </div>
         </li>

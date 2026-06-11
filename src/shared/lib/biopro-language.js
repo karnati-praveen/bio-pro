@@ -62,7 +62,7 @@ export function registerBioproLanguage() {
       { token: "number",          foreground: "B5CEA8" },
     ],
     colors: {
-      "editor.background": "#0d1117",
+      "editor.background": "var(--editor-bg)",
     },
   });
 

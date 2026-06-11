@@ -193,9 +193,9 @@ export default function SimulationEditor({ tab }) {
                 <XAxis type="number" tick={{ fontSize: 11 }} label={{ value: "% output change", position: "insideBottom", offset: -4 }} />
                 <YAxis type="category" dataKey="parameter" width={70} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(v) => `${v}%`} />
-                <ReferenceLine x={20} stroke="#e63946" strokeDasharray="4 3" />
+                <ReferenceLine x={20} stroke="var(--error)" strokeDasharray="4 3" />
                 <Bar dataKey="impact_pct">
-                  {sens.rows.map((r, i) => <Cell key={i} fill={r.critical ? "#e63946" : "#2a9d8f"} />)}
+                  {sens.rows.map((r, i) => <Cell key={i} fill={r.critical ? "var(--error)" : "var(--accent)"} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

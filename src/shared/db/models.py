@@ -1,7 +1,10 @@
-"""ORM models: Parts catalogue, Designs, and DesignVersions.
+"""ORM models: Parts catalogue, Projects, Designs, DesignVersions, and more.
 
 Each version stores the full compile request *and* response JSON, so a saved design is
 fully reproducible (and exportable) without recompiling.
+
+project_id on Designs / SimulationRuns / Experiments / SavedOrders is a plain Integer
+(no enforced FK) so that SQLite ALTER TABLE migrations work on existing databases.
 """
 
 from datetime import datetime, timezone
@@ -14,6 +17,56 @@ from shared.db.db import Base
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class Project(Base):
+    """A named project that groups designs, simulations, experiments, and orders."""
+
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    owner_email: Mapped[str] = mapped_column(String(320), default="", nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "owner_email": self.owner_email,
+            "description": self.description or "",
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+class SavedOrder(Base):
+    """A persisted DNA-order record so orders can be traced back to a project."""
+
+    __tablename__ = "saved_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    design_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    vendor: Mapped[str] = mapped_column(String(64), default="")
+    fragment_count: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    sequences_json: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "design_id": self.design_id,
+            "vendor": self.vendor,
+            "fragment_count": self.fragment_count,
+            "estimated_cost_usd": self.estimated_cost_usd,
+            "sequences": self.sequences_json or [],
+            "created_at": self.created_at.isoformat(),
+        }
 
 
 class Part(Base):
@@ -67,6 +120,7 @@ class Design(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     owner_email: Mapped[str] = mapped_column(String(320), default="", nullable=False)
+    project_id: Mapped[int] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
@@ -84,6 +138,7 @@ class SimulationRun(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     design_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    project_id: Mapped[int] = mapped_column(Integer, nullable=True)
     label: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     mode: Mapped[str] = mapped_column(String(32), default="ode")  # ode/stochastic/sweep/sensitivity
     organism: Mapped[str] = mapped_column(String(32), nullable=True)
@@ -95,6 +150,7 @@ class SimulationRun(Base):
         return {
             "id": self.id,
             "design_id": self.design_id,
+            "project_id": self.project_id,
             "label": self.label,
             "mode": self.mode,
             "organism": self.organism,
@@ -111,7 +167,9 @@ class Experiment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    project_id: Mapped[int] = mapped_column(Integer, nullable=True)
     design_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    design_version_no: Mapped[int] = mapped_column(Integer, nullable=True)
     exp_type: Mapped[str] = mapped_column(String(64), default="expression")
     date: Mapped[str] = mapped_column(String(32), nullable=True)
     protocol_ref: Mapped[str] = mapped_column(String(200), nullable=True)
@@ -123,7 +181,9 @@ class Experiment(Base):
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id, "title": self.title, "design_id": self.design_id,
+            "id": self.id, "title": self.title,
+            "project_id": self.project_id, "design_id": self.design_id,
+            "design_version_no": self.design_version_no,
             "exp_type": self.exp_type, "date": self.date, "protocol_ref": self.protocol_ref,
             "columns": self.columns_json or [], "rows": self.rows_json or [],
             "notes_md": self.notes_md or "", "created_at": self.created_at.isoformat(),

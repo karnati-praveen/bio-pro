@@ -95,7 +95,7 @@ function LinearMap({ data, onHover }) {
     <g>
       {/* Backbone line */}
       <line x1={40} y1={TRACK_Y + TRACK_H / 2} x2={SVG_W - 40} y2={TRACK_Y + TRACK_H / 2}
-        stroke="#475569" strokeWidth={2} />
+        stroke="var(--border-strong)" strokeWidth={2} />
 
       {/* Parts */}
       {parts.map((p) => {
@@ -112,7 +112,7 @@ function LinearMap({ data, onHover }) {
             {w > 30 && (
               <text
                 x={x + w / 2} y={TRACK_Y + TRACK_H / 2 + 5}
-                textAnchor="middle" fontSize={11} fill="#fff" fontWeight={600}
+                textAnchor="middle" fontSize={11} fill="var(--on-accent)" fontWeight={600}
                 style={{ pointerEvents: "none" }}
               >
                 {p.name.length > 10 ? p.name.slice(0, 9) + "…" : p.name}
@@ -121,7 +121,7 @@ function LinearMap({ data, onHover }) {
             {/* size label below */}
             <text
               x={x + w / 2} y={TRACK_Y + TRACK_H + 16}
-              textAnchor="middle" fontSize={9} fill="#94a3b8"
+              textAnchor="middle" fontSize={9} fill="var(--text-muted)"
               style={{ pointerEvents: "none" }}
             >
               {p.bp} bp
@@ -136,8 +136,8 @@ function LinearMap({ data, onHover }) {
         return (
           <g key={i}>
             <line x1={x} y1={TRACK_Y - 14} x2={x} y2={TRACK_Y + TRACK_H + 14}
-              stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="3,2" />
-            <text x={x} y={TRACK_Y - 18} textAnchor="middle" fontSize={8} fill="#f59e0b"
+              stroke="var(--warning)" strokeWidth={1.5} strokeDasharray="3,2" />
+            <text x={x} y={TRACK_Y - 18} textAnchor="middle" fontSize={8} fill="var(--warning)"
               onMouseEnter={(e) => onHover({ x: e.clientX, y: e.clientY - 40, text: `${rs.enzyme} @${rs.position}` })}
             >
               {rs.enzyme}
@@ -159,8 +159,8 @@ function LinearMap({ data, onHover }) {
             onMouseEnter={(e) => onHover({ x: e.clientX, y: e.clientY - 40, text: `${ps.name} Tm=${ps.tm}°C` })}
             style={{ cursor: "pointer" }}
           >
-            <line x1={x1} y1={arrowY} x2={x2} y2={arrowY} stroke="#38bdf8" strokeWidth={2} />
-            <path d={arrowHead} fill="#38bdf8" />
+            <line x1={x1} y1={arrowY} x2={x2} y2={arrowY} stroke="var(--info)" strokeWidth={2} />
+            <path d={arrowHead} fill="var(--info)" />
           </g>
         );
       })}
@@ -203,11 +203,11 @@ function CircularMap({ data, onHover }) {
   return (
     <g>
       {/* Outer backbone ring */}
-      <circle cx={CX} cy={CY} r={R_OUTER} fill="none" stroke="#475569" strokeWidth={2} />
-      <circle cx={CX} cy={CY} r={R_INNER} fill="none" stroke="#334155" strokeWidth={1} />
+      <circle cx={CX} cy={CY} r={R_OUTER} fill="none" stroke="var(--border-strong)" strokeWidth={2} />
+      <circle cx={CX} cy={CY} r={R_INNER} fill="none" stroke="var(--surface-3)" strokeWidth={1} />
 
       {/* Total bp label */}
-      <text x={CX} y={CY + 6} textAnchor="middle" fontSize={14} fill="#94a3b8" fontWeight={600}>
+      <text x={CX} y={CY + 6} textAnchor="middle" fontSize={14} fill="var(--text-muted)" fontWeight={600}>
         {total_bp.toLocaleString()} bp
       </text>
 
@@ -223,7 +223,7 @@ function CircularMap({ data, onHover }) {
             style={{ cursor: "pointer" }}
           >
             <path d={sectorPath(p, R_OUTER, R_INNER)} fill={p.color} opacity={0.85} />
-            <text x={lx} y={ly + 4} textAnchor="middle" fontSize={10} fill="#e2e8f0">
+            <text x={lx} y={ly + 4} textAnchor="middle" fontSize={10} fill="var(--text)">
               {p.name.length > 9 ? p.name.slice(0, 8) + "…" : p.name}
             </text>
           </g>
@@ -239,7 +239,7 @@ function CircularMap({ data, onHover }) {
         const y2 = CY + (R_OUTER + 8) * Math.sin(a);
         return (
           <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="3,2"
+            stroke="var(--warning)" strokeWidth={1.5} strokeDasharray="3,2"
             onMouseEnter={(e) => onHover({ x: e.clientX, y: e.clientY - 40, text: `${rs.enzyme} @${rs.position}` })}
             style={{ cursor: "pointer" }}
           />
@@ -251,7 +251,7 @@ function CircularMap({ data, onHover }) {
         const r = ps.strand === 1 ? R_OUTER + 12 : R_INNER - 12;
         return (
           <path key={i} d={arc(ps.start, ps.end, r)}
-            fill="none" stroke="#38bdf8" strokeWidth={3}
+            fill="none" stroke="var(--info)" strokeWidth={3}
             markerEnd="url(#primer-arrow)"
             onMouseEnter={(e) => onHover({ x: e.clientX, y: e.clientY - 40, text: `${ps.name} Tm=${ps.tm}°C` })}
             style={{ cursor: "pointer" }}
@@ -261,7 +261,7 @@ function CircularMap({ data, onHover }) {
 
       <defs>
         <marker id="primer-arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6Z" fill="#38bdf8" />
+          <path d="M0,0 L6,3 L0,6Z" fill="var(--info)" />
         </marker>
       </defs>
     </g>
@@ -282,13 +282,13 @@ function Legend({ data }) {
       ))}
       {data.restriction_sites.length > 0 && (
         <div className="legend-item">
-          <span className="legend-swatch" style={{ background: "#f59e0b" }} />
+          <span className="legend-swatch" style={{ background: "var(--warning)" }} />
           <span className="legend-name">Restriction sites ({data.restriction_sites.length})</span>
         </div>
       )}
       {data.primer_sites.length > 0 && (
         <div className="legend-item">
-          <span className="legend-swatch" style={{ background: "#38bdf8" }} />
+          <span className="legend-swatch" style={{ background: "var(--info)" }} />
           <span className="legend-name">Primer sites ({data.primer_sites.length})</span>
         </div>
       )}

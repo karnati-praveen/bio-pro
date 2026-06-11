@@ -52,9 +52,9 @@ function arrowTip(a, r, strand) {
 
 // GC percentage → CSS colour (cool-to-warm: blue → teal → amber)
 function gcColor(gc) {
-  if (gc < 40) return "#4895ef";
-  if (gc < 58) return "#2a9d8f";
-  return "#e9c46a";
+  if (gc < 40) return "var(--feat-promoter)";
+  if (gc < 58) return "var(--accent)";
+  return "var(--badge-warn-fg)";
 }
 
 // Tick spacing: choose smallest step that keeps ≤ 14 major ticks

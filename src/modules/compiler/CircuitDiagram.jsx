@@ -19,15 +19,15 @@ import { useCircuitStore } from "../../shared/stores/circuitStore.js";
 
 // Edge styling encodes regulation kind.
 const EDGE_STYLE = {
-  expression: { stroke: "#2a9d8f", label: "→ expresses" },
-  repression: { stroke: "#e76f51", label: "⊣ represses", dashed: false },
-  activation: { stroke: "#43aa8b", label: "→ activates" },
-  inhibition: { stroke: "#9d4edd", label: "⊣ inhibits", dashed: true },
+  expression: { stroke: "var(--accent)", label: "→ expresses" },
+  repression: { stroke: "var(--error)", label: "⊣ represses", dashed: false },
+  activation: { stroke: "var(--accent)", label: "→ activates" },
+  inhibition: { stroke: "var(--feat-operator)", label: "⊣ inhibits", dashed: true },
 };
 
 const NODE_MINIMAP_COLOR = {
-  promoter: "#4895ef", cds: "#2a9d8f", inducer: "#f0883e", rbs: "#ffd166",
-  terminator: "#e63946", operator: "#9d4edd", reporter: "#2ec1b0", logic: "#6c757d",
+  promoter: "var(--feat-promoter)", cds: "var(--feat-cds)", inducer: "var(--modified)", rbs: "var(--feat-rbs)",
+  terminator: "var(--feat-terminator)", operator: "var(--feat-operator)", reporter: "var(--accent)", logic: "var(--text-muted)",
 };
 
 const COL_W = 230;
@@ -61,7 +61,7 @@ function layout(nodes) {
   });
 }
 
-function FlowCanvas({ circuit }) {
+function FlowCanvas({ circuit, findings, focusNodeId, focusTs }) {
   const rf = useReactFlow();
   const [snap, setSnap] = useState(false);
   const [menu, setMenu] = useState(null); // { x, y, nodeId }
@@ -81,12 +81,46 @@ function FlowCanvas({ circuit }) {
   const posRef = useRef({});
   const [nodes, setNodes] = useState([]);
 
+  // Build nodeId → findings[] map so each node knows its problems.
+  const nodeFindings = useMemo(() => {
+    const map = {};
+    for (const f of (findings || [])) {
+      if (!f.target) continue;
+      if (!map[f.target]) map[f.target] = [];
+      map[f.target].push(f);
+    }
+    return map;
+  }, [findings]);
+
+  // Rebuild nodes whenever circuit topology or findings change.
   useEffect(() => {
     const laid = layout(circuit.nodes);
-    setNodes(laid.map((n) =>
-      posRef.current[n.id] ? { ...n, position: posRef.current[n.id] } : n
-    ));
-  }, [circuit]);
+    setNodes(laid.map((n) => {
+      const base = posRef.current[n.id] ? { ...n, position: posRef.current[n.id] } : n;
+      return { ...base, data: { ...base.data, findings: nodeFindings[n.id] || [] } };
+    }));
+  }, [circuit, nodeFindings]);
+
+  // Pan to the focused node and apply a glow effect for 2 s.
+  useEffect(() => {
+    if (!focusNodeId || !focusTs) return;
+    setNodes((prev) => prev.map((n) => ({
+      ...n,
+      className: n.id === focusNodeId ? "node-glowing" : undefined,
+    })));
+    const current = rf.getNodes().find((n) => n.id === focusNodeId);
+    if (current) {
+      rf.setCenter(
+        current.position.x + 65,
+        current.position.y + 40,
+        { duration: 500, zoom: 1.5 },
+      );
+    }
+    const timer = setTimeout(() => {
+      setNodes((prev) => prev.map((n) => ({ ...n, className: undefined })));
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [focusTs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onNodesChange = useCallback((changes) => {
     setNodes((nds) => {
@@ -102,8 +136,12 @@ function FlowCanvas({ circuit }) {
 
   const resetLayout = useCallback(() => {
     posRef.current = {};
-    setNodes(layout(circuit.nodes));
-  }, [circuit]);
+    const laid = layout(circuit.nodes);
+    setNodes(laid.map((n) => ({
+      ...n,
+      data: { ...n.data, findings: nodeFindings[n.id] || [] },
+    })));
+  }, [circuit, nodeFindings]);
 
   const rfEdges = useMemo(() => circuit.edges.map((e, i) => {
     const style = EDGE_STYLE[e.kind] || EDGE_STYLE.expression;
@@ -130,7 +168,7 @@ function FlowCanvas({ circuit }) {
   const exportPng = useCallback(() => {
     const vp = document.querySelector(".react-flow__viewport");
     if (!vp) return;
-    toPng(vp, { backgroundColor: "#ffffff", pixelRatio: 2 }).then((url) => {
+    toPng(vp, { backgroundColor: "var(--on-accent)", pixelRatio: 2 }).then((url) => {
       const a = document.createElement("a");
       a.download = "circuit.png";
       a.href = url;
@@ -205,12 +243,12 @@ function FlowCanvas({ circuit }) {
           panOnDrag={[1, 2]}
           onNodeContextMenu={onNodeContextMenu}
         >
-          <Background gap={18} color="#e8eef2" />
+          <Background gap={18} color="var(--border)" />
           <Controls showInteractive={false} />
           <MiniMap
             pannable
             zoomable
-            nodeColor={(n) => NODE_MINIMAP_COLOR[n.data?.type] || "#6c757d"}
+            nodeColor={(n) => NODE_MINIMAP_COLOR[n.data?.type] || "var(--text-muted)"}
           />
         </ReactFlow>
         {menu && (
@@ -226,13 +264,18 @@ function FlowCanvas({ circuit }) {
   );
 }
 
-export default function CircuitDiagram({ circuit }) {
+export default function CircuitDiagram({ circuit, findings, focusNodeId, focusTs }) {
   if (!circuit) {
     return <div className="panel-empty">Compile a goal to see the circuit.</div>;
   }
   return (
     <ReactFlowProvider>
-      <FlowCanvas circuit={circuit} />
+      <FlowCanvas
+        circuit={circuit}
+        findings={findings}
+        focusNodeId={focusNodeId}
+        focusTs={focusTs}
+      />
     </ReactFlowProvider>
   );
 }

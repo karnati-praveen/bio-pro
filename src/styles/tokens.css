@@ -65,6 +65,88 @@
   --muted:     var(--text-muted);
   --status-bg: var(--statusbar-bg);
   --status-fg: var(--statusbar-fg);
+
+  /* Text on colored (accent/status) backgrounds */
+  --on-accent:          #ffffff;
+
+  /* Hyperlinks */
+  --link:               #58a6ff;
+  --link-hover:         #79b8ff;
+
+  /* Unsaved-file dirty indicator dot */
+  --modified:           #f0883e;
+
+  /* DNA / sequence code-block */
+  --seq-block-bg:       #1d3557;
+  --seq-block-fg:       #a8d8ea;
+
+  /* Raw terminal / console output */
+  --console-bg:         #0a0a0a;
+  --console-fg:         #a8d8a8;
+
+  /* LLM console metadata strip */
+  --llm-bg:             #0e1e16;
+
+  /* Raised status badge surfaces (solid fills on dark bg) */
+  --badge-ok-bg:        #2d6a4f;
+  --badge-ok-fg:        #95d5b2;
+  --badge-error-bg:     #4a1010;
+  --badge-error-fg:     #f4978e;
+  --badge-warn-bg:      #4a3500;
+  --badge-warn-fg:      #e9c46a;
+
+  /* Reporter-node indicator glow */
+  --reporter-glow:      #ffd166;
+
+  /* Diff view insert / delete / hunk-header */
+  --diff-ins:           #3fb950;
+  --diff-del:           #f85149;
+  --diff-hunk:          #58a6ff;
+
+  /* Sequence-editor nucleotide base colors (scientific convention) */
+  --base-a:             #3a86ff;
+  --base-c:             #ffbe0b;
+  --base-g:             #2a9d8f;
+  --base-t:             #e63946;
+  --base-n:             #8b949e;
+
+  /* Sequence-editor feature-type colors */
+  --feat-promoter:      #4895ef;
+  --feat-cds:           #2a9d8f;
+  --feat-rbs:           #ffd166;
+  --feat-terminator:    #e63946;
+  --feat-operator:      #9d4edd;
+  --feat-misc:          #8b949e;
+
+  /* Host-organism dot colors */
+  --host-ecoli:         var(--success);
+  --host-yeast:         var(--warning);
+  --host-mammalian:     var(--info);
+  --host-none:          var(--text-faint);
+
+  /* Chart / simulation data-series palette */
+  --series-1:           #4ade80;
+  --series-2:           #60a5fa;
+  --series-3:           #f59e0b;
+  --series-4:           #f472b6;
+  --series-5:           #a78bfa;
+  --series-6:           #34d399;
+
+  /* Alignment viewer — ClustalW scientific-convention colors (invariant) */
+  --align-basic:        #3a7ebf;
+  --align-acidic:       #d9534f;
+  --align-polar:        #4ec94e;
+  --align-nonpolar:     #c8c8c8;
+  --align-gly:          #f0ad4e;
+  --align-cys-aa:       #e6c619;
+  --align-his:          #7b9ec9;
+  --align-unk:          #888888;
+
+  /* Parts/circuit legend — inducer lavender (invariant) */
+  --parts-inducer:      #cdb4db;
+
+  /* Dark text on light/colored backgrounds (e.g. alignment cell labels) */
+  --text-on-color:      #111111;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────── */
@@ -119,6 +201,88 @@
   --muted:     var(--text-muted);
   --status-bg: var(--statusbar-bg);
   --status-fg: var(--statusbar-fg);
+
+  /* Text on colored (accent/status) backgrounds */
+  --on-accent:          #ffffff;
+
+  /* Hyperlinks */
+  --link:               #1060a0;
+  --link-hover:         #0d4a80;
+
+  /* Unsaved-file dirty indicator dot */
+  --modified:           #e65100;
+
+  /* DNA / sequence code-block (intentionally dark in both themes) */
+  --seq-block-bg:       #1d3557;
+  --seq-block-fg:       #a8d8ea;
+
+  /* Raw terminal / console output (intentionally dark) */
+  --console-bg:         #1a1a1a;
+  --console-fg:         #a8d8a8;
+
+  /* LLM console metadata strip */
+  --llm-bg:             #1a2e1a;
+
+  /* Raised status badge surfaces */
+  --badge-ok-bg:        #dcf5e8;
+  --badge-ok-fg:        #145a2a;
+  --badge-error-bg:     #fde8e8;
+  --badge-error-fg:     #9b1c1c;
+  --badge-warn-bg:      #fef3c7;
+  --badge-warn-fg:      #92400e;
+
+  /* Reporter-node indicator glow */
+  --reporter-glow:      #f0a000;
+
+  /* Diff view insert / delete / hunk-header */
+  --diff-ins:           #1d7a38;
+  --diff-del:           #c0202e;
+  --diff-hunk:          #0460c8;
+
+  /* Sequence-editor nucleotide base colors (scientific convention) */
+  --base-a:             #1a62d6;
+  --base-c:             #d4860a;
+  --base-g:             #1a7a60;
+  --base-t:             #c0202e;
+  --base-n:             #6a7b8a;
+
+  /* Sequence-editor feature-type colors */
+  --feat-promoter:      #1e54c4;
+  --feat-cds:           #1a7a60;
+  --feat-rbs:           #a06a00;
+  --feat-terminator:    #c0202e;
+  --feat-operator:      #6d24cc;
+  --feat-misc:          #6a7b8a;
+
+  /* Host-organism dot colors */
+  --host-ecoli:         var(--success);
+  --host-yeast:         var(--warning);
+  --host-mammalian:     var(--info);
+  --host-none:          var(--text-faint);
+
+  /* Chart / simulation data-series palette (adjusted for light bg) */
+  --series-1:           #16a34a;
+  --series-2:           #2563eb;
+  --series-3:           #d97706;
+  --series-4:           #db2777;
+  --series-5:           #7c3aed;
+  --series-6:           #059669;
+
+  /* Alignment viewer — ClustalW scientific-convention colors (invariant) */
+  --align-basic:        #3a7ebf;
+  --align-acidic:       #d9534f;
+  --align-polar:        #4ec94e;
+  --align-nonpolar:     #c8c8c8;
+  --align-gly:          #f0ad4e;
+  --align-cys-aa:       #e6c619;
+  --align-his:          #7b9ec9;
+  --align-unk:          #888888;
+
+  /* Parts/circuit legend — inducer lavender (invariant) */
+  --parts-inducer:      #cdb4db;
+
+  /* Dark text on light/colored backgrounds (e.g. alignment cell labels) */
+  --text-on-color:      #111111;
 }
 
 /* ── Color-blind safe palette override ───────────────────────────────────── */

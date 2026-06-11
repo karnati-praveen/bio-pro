@@ -5,12 +5,15 @@ import { useEffect, useState } from "react";
 import { DiffEditor } from "@monaco-editor/react";
 import {
   addVersion,
+  attachDesignToProject,
   diffVersions,
   exportInline,
   listDesigns,
   loadVersion,
   saveDesign,
 } from "../../shared/lib/api/client.js";
+import { useBioProjectStore } from "../../shared/stores/bioProjectStore.js";
+import { Panel, PanelHeader, Button, Input } from "../../shared/ui/primitives/index.js";
 
 const FORMATS = ["genbank", "fasta", "sbol", "json"];
 
@@ -19,6 +22,9 @@ export default function DesignsPanel({ result, request, onLoad }) {
   const [name, setName] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [status, setStatus] = useState(null);
+
+  const activeProjectId = useBioProjectStore((s) => s.activeProjectId);
+  const refreshActive = useBioProjectStore((s) => s.refreshActive);
 
   // { designId: number, versions: number[] } — at most 2 versions from the same design
   const [diffSel, setDiffSel] = useState({ designId: null, versions: [] });
@@ -43,14 +49,12 @@ export default function DesignsPanel({ result, request, onLoad }) {
   const handleToggleVersion = (designId, versionNo) => {
     setDiffSel((prev) => {
       if (prev.designId !== designId) {
-        // Different design — start fresh
         return { designId, versions: [versionNo] };
       }
       const already = prev.versions.includes(versionNo);
       if (already) {
         return { ...prev, versions: prev.versions.filter((v) => v !== versionNo) };
       }
-      // Keep at most 2; drop the oldest when adding a third
       const next = [...prev.versions, versionNo].slice(-2);
       return { ...prev, versions: next };
     });
@@ -73,11 +77,16 @@ export default function DesignsPanel({ result, request, onLoad }) {
     try {
       if (activeId) {
         const v = await addVersion(activeId, request, result);
-        setStatus(`Saved v${v.version_no}`);
+        setStatus(`Saved v${v.version_no}${activeProjectId ? ` · project ${activeProjectId}` : ""}`);
+        if (activeProjectId) {
+          await attachDesignToProject(activeProjectId, activeId).catch(() => {});
+          refreshActive();
+        }
       } else {
-        const d = await saveDesign(name || "Untitled design", request, result);
+        const d = await saveDesign(name || "Untitled design", request, result, activeProjectId);
         setActiveId(d.id);
-        setStatus(`Saved "${d.name}" (v1)`);
+        setStatus(`Saved "${d.name}" (v1)${activeProjectId ? ` · project ${activeProjectId}` : ""}`);
+        refreshActive();
       }
       refresh();
     } catch (e) {
@@ -104,103 +113,107 @@ export default function DesignsPanel({ result, request, onLoad }) {
     : null;
 
   return (
-    <div className="designs-panel">
-      <h3>Designs</h3>
+    <Panel>
+      <PanelHeader title="Designs" />
+      <div style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-3)", overflow: "auto" }}>
 
-      <div className="designs-save">
-        <input
-          type="text"
-          placeholder="Design name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          disabled={!!activeId}
-        />
-        <button onClick={handleSave} disabled={!result}>
-          {activeId ? "Save new version" : "Save"}
-        </button>
-        {activeId && (
-          <button className="link-btn" onClick={() => { setActiveId(null); setName(""); }}>
-            new
-          </button>
-        )}
-      </div>
-
-      {result && (
-        <div className="designs-export">
-          <span className="muted">Export:</span>
-          {FORMATS.map((fmt) => (
-            <button key={fmt} className="link-btn" onClick={() => exportInline(result, fmt)}>
-              {fmt}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {status && <p className="muted designs-status">{status}</p>}
-
-      {designs.length > 0 && (
-        <ul className="designs-list">
-          {designs.map((d) => (
-            <li key={d.id} className={d.id === activeId ? "active" : ""}>
-              <span className="designs-name">{d.name}</span>
-              <span className="designs-versions">
-                {Array.from({ length: d.latest_version }, (_, i) => i + 1).map((v) => (
-                  <span key={v} className="designs-version-item">
-                    <input
-                      type="checkbox"
-                      className="version-check"
-                      checked={isChecked(d.id, v)}
-                      onChange={() => handleToggleVersion(d.id, v)}
-                      title={`Select v${v} for comparison`}
-                    />
-                    <button className="link-btn" onClick={() => handleLoad(d.id, v)}>
-                      v{v}
-                    </button>
-                    {v > 1 && (
-                      <button
-                        className="link-btn version-diff-link"
-                        onClick={() => handleCompareWithPrev(d.id, v)}
-                        title={`Compare v${v - 1} → v${v}`}
-                      >
-                        ↔
-                      </button>
-                    )}
-                  </span>
-                ))}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {showDiff && (
-        <div className="version-diff">
-          <div className="version-diff-header">
-            <span className="version-diff-title">
-              {diffSel.versions.length === 2 ? `v${olderV} → v${newerV}` : "Diff"}
-            </span>
-            {diffLoading && <span className="muted">Loading…</span>}
-            {diffSummary && <span className="version-diff-summary muted">{diffSummary}</span>}
-            <button className="link-btn" onClick={closeDiff} title="Close diff">✕</button>
-          </div>
-          {diffData && (
-            <DiffEditor
-              original={diffData.older_dsl}
-              modified={diffData.newer_dsl}
-              language="plaintext"
-              height="280px"
-              theme="vs-dark"
-              options={{
-                readOnly: true,
-                renderSideBySide: true,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                fontSize: 12,
-              }}
-            />
+        <div className="designs-save">
+          <Input
+            type="text"
+            placeholder="Design name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={!!activeId}
+            style={{ flex: 1 }}
+          />
+          <Button variant="primary" size="sm" onClick={handleSave} disabled={!result}>
+            {activeId ? "Save new version" : "Save"}
+          </Button>
+          {activeId && (
+            <Button variant="link" size="sm" onClick={() => { setActiveId(null); setName(""); }}>
+              new
+            </Button>
           )}
         </div>
-      )}
-    </div>
+
+        {result && (
+          <div className="designs-export">
+            <span className="muted">Export:</span>
+            {FORMATS.map((fmt) => (
+              <Button key={fmt} variant="link" size="sm" onClick={() => exportInline(result, fmt)}>
+                {fmt}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {status && <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{status}</p>}
+
+        {designs.length > 0 && (
+          <ul className="designs-list">
+            {designs.map((d) => (
+              <li key={d.id} className={d.id === activeId ? "active" : ""}>
+                <span className="designs-name">{d.name}</span>
+                <span className="designs-versions">
+                  {Array.from({ length: d.latest_version }, (_, i) => i + 1).map((v) => (
+                    <span key={v} className="designs-version-item">
+                      <input
+                        type="checkbox"
+                        className="version-check"
+                        checked={isChecked(d.id, v)}
+                        onChange={() => handleToggleVersion(d.id, v)}
+                        title={`Select v${v} for comparison`}
+                      />
+                      <Button variant="link" size="sm" onClick={() => handleLoad(d.id, v)}>
+                        v{v}
+                      </Button>
+                      {v > 1 && (
+                        <Button
+                          variant="link" size="sm"
+                          className="version-diff-link"
+                          onClick={() => handleCompareWithPrev(d.id, v)}
+                          title={`Compare v${v - 1} → v${v}`}
+                        >
+                          ↔
+                        </Button>
+                      )}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {showDiff && (
+          <div className="version-diff">
+            <div className="version-diff-header">
+              <span className="version-diff-title">
+                {diffSel.versions.length === 2 ? `v${olderV} → v${newerV}` : "Diff"}
+              </span>
+              {diffLoading && <span className="muted">Loading…</span>}
+              {diffSummary && <span className="version-diff-summary muted">{diffSummary}</span>}
+              <Button variant="ghost" size="sm" onClick={closeDiff} title="Close diff">✕</Button>
+            </div>
+            {diffData && (
+              <DiffEditor
+                original={diffData.older_dsl}
+                modified={diffData.newer_dsl}
+                language="plaintext"
+                height="280px"
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  renderSideBySide: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 12,
+                }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }

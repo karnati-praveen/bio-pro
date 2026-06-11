@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceDot,
 } from "recharts";
 import { chemIsotopes } from "../../shared/lib/api/client.js";
+import { useUiStore } from "../../shared/stores/uiStore.js";
 
 const TYPES = {
   nmr:   { label: "NMR (¹H/¹³C)", x: "chemical shift (ppm)", reverse: true },
@@ -20,6 +21,12 @@ export default function SpectrumEditor({ tab }) {
   const [formula, setFormula] = useState("");
   const [isotopes, setIsotopes] = useState(null);
   const fileRef = useRef(null);
+  const theme = useUiStore((s) => s.theme);
+  const isDark = theme === "dark";
+  const tickColor     = "var(--text-muted)";
+  const labelColor    = "var(--text)";
+  const tooltipBg     = "var(--surface-2)";
+  const tooltipBorder = "var(--border)";
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
@@ -67,14 +74,17 @@ export default function SpectrumEditor({ tab }) {
           <ResponsiveContainer width="100%" height={360}>
             <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 24, left: 8 }}>
               <XAxis dataKey="x" type="number" reversed={meta.reverse}
-                domain={["dataMin", "dataMax"]} tick={{ fontSize: 11 }}
-                label={{ value: meta.x, position: "insideBottom", offset: -12 }} />
-              <YAxis tick={{ fontSize: 11 }} label={{ value: "intensity", angle: -90, position: "insideLeft" }} />
-              <Tooltip formatter={(v) => v.toFixed?.(2) ?? v} />
-              <Line type="monotone" dataKey="y" stroke="#2a9d8f" dot={false} strokeWidth={1.3} isAnimationActive={false} />
+                domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: tickColor }}
+                label={{ value: meta.x, position: "insideBottom", offset: -12, fill: labelColor }} />
+              <YAxis tick={{ fontSize: 11, fill: tickColor }}
+                label={{ value: "intensity", angle: -90, position: "insideLeft", fill: labelColor }} />
+              <Tooltip formatter={(v) => v.toFixed?.(2) ?? v}
+                contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, color: labelColor }}
+                labelStyle={{ color: labelColor }} />
+              <Line type="monotone" dataKey="y" stroke="var(--accent)" dot={false} strokeWidth={1.3} isAnimationActive={false} />
               {isotopes?.map((p, i) => (
                 <ReferenceDot key={i} x={p.mz} y={(p.intensity / 100) * (data.ymax || 1)} r={4}
-                  fill="#e63946" stroke="none" label={{ value: p.label, fontSize: 10, fill: "#e63946" }} />
+                  fill="var(--error)" stroke="none" label={{ value: p.label, fontSize: 10, fill: "var(--error)" }} />
               ))}
             </LineChart>
           </ResponsiveContainer>

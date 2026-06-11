@@ -70,7 +70,7 @@ export default function PathwayEditor() {
       <div className="pathway-body">
         <div className="pathway-canvas">
           <ReactFlow nodes={nodes} edges={edges} fitView proOptions={{ hideAttribution: true }} nodesDraggable>
-            <Background gap={18} color="#e8eef2" />
+            <Background gap={18} color="var(--border)" />
             <Controls showInteractive={false} />
             <MiniMap />
           </ReactFlow>
@@ -110,13 +110,13 @@ function buildGraph(model, fba) {
     metY[m] = i;
     nodes.push({
       id: `m:${m}`, data: { label: m }, position: { x: 0, y: i * 70 },
-      style: { background: "#e8f5f3", border: "1px solid #2a9d8f", borderRadius: 16, fontSize: 11, padding: 4, width: 110 },
+      style: { background: "var(--accent-subtle)", border: "1px solid var(--accent)", borderRadius: 16, fontSize: 11, padding: 4, width: 110 },
     });
   });
   model.reactions.forEach((r, i) => {
     nodes.push({
       id: `r:${r.id}`, data: { label: r.id }, position: { x: 320, y: i * 60 },
-      style: { background: "#fff", border: "1px solid #457b9d", borderRadius: 4, fontSize: 11, padding: 4, width: 120 },
+      style: { background: "var(--surface)", border: "1px solid var(--link)", borderRadius: 4, fontSize: 11, padding: 4, width: 120 },
     });
   });
 
@@ -126,7 +126,7 @@ function buildGraph(model, fba) {
     const flux = fba?.fluxes?.[r.id] ?? 0;
     const bottleneck = fba?.bottlenecks?.includes(r.id);
     const w = fba ? 1 + (Math.abs(flux) / maxFlux) * 6 : 1.5;
-    const color = bottleneck ? "#e63946" : flux > 0 ? "#2a9d8f" : "#adb5bd";
+    const color = bottleneck ? "var(--error)" : flux > 0 ? "var(--accent)" : "var(--text-muted)";
     Object.entries(r.stoich || {}).forEach(([met, coeff]) => {
       const consumed = coeff < 0;
       edges.push({
